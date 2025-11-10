@@ -129,8 +129,8 @@ impl UserInterface {
                 let content_chunks = content_chunks(main_chunks[0]);
                 if content_chunks[1].contains(pos) {
                     let local_pos = Position {
-                        x: pos.x.saturating_sub(area.x),
-                        y: pos.y.saturating_sub(area.y),
+                        x: pos.x.saturating_sub(content_chunks[1].x),
+                        y: pos.y.saturating_sub(content_chunks[1].y),
                     };
                     self.content
                         .push_str(&format!("Main editor click: {:?}\n", pos));
