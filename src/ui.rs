@@ -2,7 +2,7 @@ use anyhow::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
     widgets::{Block, Paragraph},
 };
 use tui_textarea::Input;
@@ -37,6 +37,7 @@ pub struct UserInterface {
     content: String,
     editor: Editor,
     composite_editor: CompositeEditor,
+    current_area: Option<Rect>,
 }
 
 impl UserInterface {
@@ -45,7 +46,8 @@ impl UserInterface {
         let composite_editors = vec![
             Editor::default()
                 .with_title("Editor 1")
-                .with_single_line(true),
+                .with_single_line(true)
+                .with_placeholder("Single line editor"),
             Editor::default()
                 .with_title("Editor 2")
                 .with_content(EDITOR_CONTENT),
@@ -73,6 +75,7 @@ impl UserInterface {
             content: String::new(),
             editor,
             composite_editor,
+            current_area: None,
         }
     }
 
@@ -119,8 +122,32 @@ impl UserInterface {
         }
     }
 
+    pub fn handle_mouse_click(&mut self, pos: Position) {
+        if let Some(area) = &self.current_area {
+            let main_chunks = main_chunks(area.clone());
+            if main_chunks[0].contains(pos) {
+                let content_chunks = content_chunks(main_chunks[0]);
+                if content_chunks[1].contains(pos) {
+                    if let Some(local) = get_local_position(pos, content_chunks[1]) {
+                        self.content
+                            .push_str(&format!("Main editor click: {:?}\n", local));
+                        self.editor.on_click(local);
+                    }
+                } else if content_chunks[2].contains(pos) {
+                    self.content
+                        .push_str(&format!("Composite editor click: {:?}\n", pos));
+                    self.composite_editor.on_click(pos);
+                }
+            }
+        }
+        // let content_chunks = content_chunks(main_chunks[0]);
+        // self.mouse_clicked = Some((x, y));
+        // self.composite_editor.set_active_editor_at_position(x, y);
+    }
+
     pub fn draw(&mut self, f: &mut Frame, area: Rect) -> Result<()> {
         let main_chunks = main_chunks(area);
+        self.current_area = Some(area.clone());
         let content_chunks = content_chunks(main_chunks[0]);
         // self.render_header(f, main_chunks[0]);
         self.render_content(f, content_chunks)?;
@@ -148,6 +175,7 @@ impl UserInterface {
             .wrap(ratatui::widgets::Wrap { trim: true });
         f.render_widget(p, areas[0]);
         f.render_widget(&self.editor, areas[1]);
+        self.composite_editor.set_last_area(areas[2].clone());
         f.render_widget(&self.composite_editor, areas[2]);
         Ok(())
     }
@@ -180,6 +208,13 @@ fn content_chunks(area: Rect) -> Vec<Rect> {
         ])
         .split(area)
         .to_vec()
+}
+
+fn get_local_position(global: Position, area: Rect) -> Option<Position> {
+    area.contains(global).then(|| Position {
+        x: global.x.saturating_sub(area.x),
+        y: global.y.saturating_sub(area.y),
+    })
 }
 
 // fn popup_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

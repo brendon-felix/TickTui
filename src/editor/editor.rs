@@ -1,4 +1,6 @@
 use ratatui::{
+    buffer::Buffer,
+    layout::{Position, Rect},
     style::{Modifier, Style},
     widgets::{Block, Widget, WidgetRef},
 };
@@ -23,6 +25,7 @@ pub struct Editor {
     textarea: TextArea<'static>,
     single_line: bool,
     validator: Option<Box<dyn Fn(&TextArea) -> bool>>,
+    current_block: Option<Block<'static>>,
 }
 
 impl Default for Editor {
@@ -42,6 +45,7 @@ impl Default for Editor {
             textarea,
             single_line: false,
             validator: None,
+            current_block: None,
         }
     }
 }
@@ -82,6 +86,7 @@ impl Editor {
     }
 
     pub fn with_block(mut self, block: Block<'static>) -> Self {
+        self.current_block = Some(block.clone());
         self.textarea.set_block(block);
         self
     }
@@ -102,6 +107,7 @@ impl Editor {
     }
 
     pub fn set_block(&mut self, block: Block<'static>) {
+        self.current_block = Some(block.clone());
         self.textarea.set_block(block);
     }
 
@@ -144,6 +150,15 @@ impl Editor {
 
     pub fn get_lines(&self) -> &[String] {
         self.textarea.lines()
+    }
+
+    pub fn on_click(&mut self, local_pos: Position) {
+        let (x, y) = if let Some(_block) = &self.current_block {
+            (local_pos.x.saturating_sub(1), local_pos.y.saturating_sub(1))
+        } else {
+            local_pos.into()
+        };
+        self.textarea.move_cursor(CursorMove::Jump(y, x));
     }
 }
 
@@ -404,14 +419,13 @@ impl EditorActions for Editor {
 }
 
 impl Widget for Editor {
-    fn render(self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer) {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         self.textarea.render(area, buf);
     }
 }
 
 impl WidgetRef for Editor {
-    fn render_ref(&self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer) {
-        // self.textarea.render_ref(area, buf);
+    fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         self.textarea.clone().render(area, buf);
     }
 }

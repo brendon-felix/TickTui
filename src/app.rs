@@ -5,7 +5,8 @@ use crate::{
 };
 
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::Position;
 // use std::sync::Arc;
 // use ticks::TickTick;
 use tokio::sync::mpsc::{self, UnboundedSender};
@@ -15,6 +16,7 @@ enum Action {
     Tick,
     Render,
     Resize(u16, u16),
+    Click(Position),
     Quit,
     // Error(String),
     // RefreshTasks,
@@ -77,7 +79,7 @@ impl TickTui {
             term::Event::Render => tx.send(Action::Render)?,
             term::Event::Resize(w, h) => tx.send(Action::Resize(w, h))?,
             term::Event::Key(key) => self.handle_key_event(key, tx)?,
-            term::Event::Mouse(_mouse) => {}
+            term::Event::Mouse(mouse) => self.handle_mouse_event(mouse, tx)?,
             term::Event::Paste(_content) => {}
             _ => {}
         }
@@ -102,11 +104,30 @@ impl TickTui {
         Ok(())
     }
 
+    fn handle_mouse_event(
+        &mut self,
+        mouse: MouseEvent,
+        tx: &UnboundedSender<Action>,
+    ) -> Result<()> {
+        match mouse.kind {
+            MouseEventKind::Down(button) => match button {
+                MouseButton::Left => tx.send(Action::Click(Position {
+                    x: mouse.column,
+                    y: mouse.row,
+                }))?,
+                _ => {}
+            },
+            _ => {}
+        }
+        Ok(())
+    }
+
     fn update(&mut self, action: Action) -> Result<()> {
         match action {
             Action::Tick => {}
             Action::Render => self.render()?,
             Action::Resize(w, h) => self.ti.resize(w, h)?,
+            Action::Click(pos) => self.ui.handle_mouse_click(pos),
             Action::Quit => self.quitting = true,
             // Action::Error(msg) => self.error(msg),
             // _ => {}

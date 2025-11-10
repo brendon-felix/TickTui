@@ -1,7 +1,10 @@
 use anyhow::Result;
 use crossterm::{
     cursor,
-    event::{Event as CrosstermEvent, KeyEvent, KeyEventKind, MouseEvent},
+    event::{
+        DisableMouseCapture, EnableMouseCapture, Event as CrosstermEvent, KeyEvent, KeyEventKind,
+        MouseEvent,
+    },
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures::{FutureExt, StreamExt};
@@ -142,6 +145,7 @@ impl TerminalInterface {
     pub fn enter(&mut self) -> Result<()> {
         crossterm::terminal::enable_raw_mode()?;
         crossterm::execute!(stdout(), EnterAlternateScreen, cursor::Hide)?;
+        crossterm::execute!(stdout(), EnableMouseCapture)?;
         self.start();
         Ok(())
     }
@@ -151,6 +155,7 @@ impl TerminalInterface {
         if crossterm::terminal::is_raw_mode_enabled()? {
             self.flush()?;
             crossterm::execute!(stdout(), LeaveAlternateScreen, cursor::Show)?;
+            crossterm::execute!(stdout(), DisableMouseCapture)?;
             crossterm::terminal::disable_raw_mode()?;
         }
         Ok(())

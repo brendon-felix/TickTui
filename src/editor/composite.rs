@@ -1,6 +1,6 @@
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
     widgets::{Borders, Widget, WidgetRef},
 };
@@ -14,6 +14,7 @@ pub struct CompositeEditor {
     editors: Vec<Editor>,
     active_index: Option<usize>,
     constraints: Vec<Constraint>,
+    last_area: Option<Rect>,
 }
 
 #[allow(dead_code)]
@@ -24,6 +25,7 @@ impl CompositeEditor {
             editors,
             active_index,
             constraints,
+            last_area: None,
         };
         composite.set_active_editor(active_index);
         composite
@@ -57,6 +59,35 @@ impl CompositeEditor {
         self.active_index
             .and_then(|index| self.editors.get(index))
             .map(|editor| editor.get_mode())
+    }
+
+    pub fn set_last_area(&mut self, area: Rect) {
+        self.last_area = Some(area);
+    }
+
+    fn create_chunks(&self, area: Rect) -> Vec<Rect> {
+        Layout::vertical(self.constraints.clone())
+            .split(area)
+            .to_vec()
+    }
+
+    pub fn on_click(&mut self, pos: Position) {
+        if let Some(area) = self.last_area {
+            let chunks = self.create_chunks(area);
+            for (i, chunk) in chunks.iter().enumerate() {
+                if chunk.contains(pos) {
+                    self.set_active_editor(Some(i));
+                    if let Some(editor) = self.get_active_editor() {
+                        let local = Position::new(
+                            pos.x.saturating_sub(chunk.x),
+                            pos.y.saturating_sub(chunk.y),
+                        );
+                        editor.on_click(local);
+                    }
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -133,8 +164,7 @@ impl EditorActions for CompositeEditor {
 
 impl Widget for CompositeEditor {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let layout = Layout::vertical(self.constraints);
-        let chunks = layout.split(area);
+        let chunks = self.create_chunks(area);
         for (i, editor) in self.editors.into_iter().enumerate() {
             editor.render(chunks[i], buf);
         }
@@ -143,16 +173,9 @@ impl Widget for CompositeEditor {
 
 impl WidgetRef for CompositeEditor {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
-        let layout = Layout::vertical(self.constraints.clone());
-        let chunks = layout.split(area);
+        let chunks = self.create_chunks(area);
         for (i, editor) in self.editors.iter().enumerate() {
             editor.render_ref(chunks[i], buf);
         }
     }
 }
-
-// impl StatefulWidget for CompositeEditor {
-//     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-
-//     }
-// }
