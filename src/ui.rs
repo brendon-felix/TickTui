@@ -104,28 +104,6 @@ impl UserInterface {
         }
     }
 
-    // pub fn handle_action(&mut self, action: EditorAction) {
-    //     match self.active_widget {
-    //         Some(ActiveWidget::MainEditor) => match action {
-    //             _ => self.editor.execute_action(action),
-    //         },
-    //         Some(ActiveWidget::CompositeEditor) => match action {
-    //             _ => self.composite_editor.execute_action(action),
-    //         },
-    //         None => {}
-    //     }
-    //     match action_clone {
-    //         EditorAction::ApplyInput(_) => {}
-    //         EditorAction::MoveCursor(mvmt) => match mvmt {
-    //             CursorMove::Right
-    //         },
-    //         _ => {
-    //             self.content
-    //                 .push_str(&format!("Handling action: {:?}\n", action_clone));
-    //         }
-    //     }
-    // }
-
     pub fn handle_key_event_main_editor(&mut self, event: KeyEvent) {
         let input: Input = event.into();
         let mode = self.editor.get_mode();
@@ -149,11 +127,7 @@ impl UserInterface {
                     }
                     _ => self.editor.execute_action(action),
                 },
-                _ => {
-                    self.content
-                        .push_str(&format!("Handling action: {:?}\n", action));
-                    self.editor.execute_action(action)
-                }
+                _ => self.editor.execute_action(action),
             },
             None => {}
         }
@@ -183,11 +157,7 @@ impl UserInterface {
                         }
                         _ => self.composite_editor.execute_action(action),
                     },
-                    _ => {
-                        self.content
-                            .push_str(&format!("Handling action: {:?}\n", action));
-                        self.composite_editor.execute_action(action)
-                    }
+                    _ => self.composite_editor.execute_action(action),
                 },
                 None => {}
             }
