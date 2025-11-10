@@ -1,12 +1,9 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Position, Rect},
-    style::{Color, Modifier, Style},
-    widgets::{Borders, Widget, WidgetRef},
+    widgets::{Widget, WidgetRef},
 };
 use tui_textarea::CursorMove;
-
-use crate::editor::{create_block, cursor_style};
 
 use super::{Editor, EditorAction, EditorActions, EditorMode, EditorPendingAction};
 #[allow(dead_code)]
@@ -35,17 +32,9 @@ impl CompositeEditor {
         self.active_index = index;
         self.editors.iter_mut().enumerate().for_each(|(i, editor)| {
             if Some(i) == index {
-                editor.set_cursor_style(cursor_style(editor.get_mode(), true));
-                editor.set_style(Style::default().fg(Color::Reset));
-                let is_active = true;
-                let borders = Borders::ALL;
-                editor.set_block(create_block(editor.get_title(), is_active, borders))
+                editor.set_editor_style(super::EditorStyle::Active);
             } else {
-                editor.set_cursor_style(cursor_style(editor.get_mode(), false));
-                editor.set_style(Style::default().add_modifier(Modifier::DIM));
-                let is_active = false;
-                let borders = Borders::ALL;
-                editor.set_block(create_block(editor.get_title(), is_active, borders))
+                editor.set_editor_style(super::EditorStyle::Inactive);
             }
         });
     }
@@ -87,6 +76,14 @@ impl CompositeEditor {
                     break;
                 }
             }
+        }
+    }
+
+    pub fn is_cursor_at_line_start(&mut self) -> bool {
+        if let Some(editor) = self.get_active_editor() {
+            editor.is_cursor_at_line_start()
+        } else {
+            false
         }
     }
 }

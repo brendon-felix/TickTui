@@ -2,9 +2,11 @@ use ratatui::{
     buffer::Buffer,
     layout::{Position, Rect},
     style::{Modifier, Style},
-    widgets::{Block, Widget, WidgetRef},
+    widgets::{Block, Borders, Widget, WidgetRef},
 };
 use tui_textarea::{CursorMove, TextArea};
+
+use crate::editor::{EditorStyle, create_block};
 
 use super::{
     EditorAction, EditorActions, EditorMode, EditorPendingAction, TextObject, TextObjectModifier,
@@ -159,6 +161,39 @@ impl Editor {
             local_pos.into()
         };
         self.textarea.move_cursor(CursorMove::Jump(y, x));
+    }
+
+    pub fn is_cursor_at_line_end(&self) -> bool {
+        let (row, col) = self.textarea.cursor();
+        if let Some(line) = self.textarea.lines().get(row) {
+            col >= line.len()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_cursor_at_line_start(&self) -> bool {
+        let (_row, col) = self.textarea.cursor();
+        col == 0
+    }
+
+    pub fn set_editor_style(&mut self, style: EditorStyle) {
+        match style {
+            EditorStyle::Active => {
+                let is_active = true;
+                self.set_cursor_style(cursor_style(self.get_mode(), is_active));
+                self.set_style(Style::default());
+                let borders = Borders::ALL;
+                self.set_block(create_block(self.get_title(), is_active, borders))
+            }
+            EditorStyle::Inactive => {
+                let is_active = false;
+                self.set_cursor_style(cursor_style(self.get_mode(), is_active));
+                self.set_style(Style::default().add_modifier(Modifier::DIM));
+                let borders = Borders::ALL;
+                self.set_block(create_block(self.get_title(), is_active, borders))
+            }
+        }
     }
 }
 

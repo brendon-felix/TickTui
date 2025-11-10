@@ -5,15 +5,15 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
     widgets::{Block, Paragraph},
 };
-use tui_textarea::Input;
+use tui_textarea::{CursorMove, Input};
 // use tui_text::{EditorEventHandler, EditorMode, EditorState, EditorTheme, EditorView};
 
-// enum ActiveWidget {
-//     MainEditor,
-//     CompositeEditor,
-//     // TaskList,
-//     // Popup,
-// }
+enum ActiveWidget {
+    MainEditor,
+    CompositeEditor,
+    // TaskList,
+    // Popup,
+}
 
 const EDITOR_CONTENT: &str = r#"fn factorial(n: u32) -> u32 {
     if n == 0 {
@@ -29,7 +29,7 @@ fn main() {
 }"#;
 
 use crate::editor::{
-    CompositeEditor, Editor, EditorAction, EditorActions, EditorMode, handle_input,
+    CompositeEditor, Editor, EditorAction, EditorActions, EditorMode, EditorStyle, handle_input,
     handle_pending_action_input,
 };
 
@@ -38,6 +38,7 @@ pub struct UserInterface {
     editor: Editor,
     composite_editor: CompositeEditor,
     current_area: Option<Rect>,
+    active_widget: Option<ActiveWidget>,
 }
 
 impl UserInterface {
@@ -61,7 +62,7 @@ impl UserInterface {
             Constraint::Min(3),
         ];
         let mut composite_editor = CompositeEditor::new(composite_editors, constraints);
-        composite_editor.set_active_editor(Some(0));
+        composite_editor.set_active_editor(None);
         let editor = Editor::default()
             .with_title("Main Editor")
             .with_content(EDITOR_CONTENT)
@@ -76,6 +77,7 @@ impl UserInterface {
             editor,
             composite_editor,
             current_area: None,
+            active_widget: Some(ActiveWidget::MainEditor),
         }
     }
 
@@ -87,20 +89,77 @@ impl UserInterface {
         self.composite_editor.get_mode()
     }
 
-    pub fn handle_action(&mut self, action: EditorAction) {
-        let action_clone = action.clone();
-        match action_clone {
-            EditorAction::ApplyInput(_) => {}
-            EditorAction::MoveCursor(_) => {}
-            _ => {
-                self.content
-                    .push_str(&format!("Handling action: {:?}\n", action_clone));
+    fn set_active_widget(&mut self, widget: ActiveWidget) {
+        match widget {
+            ActiveWidget::MainEditor => {
+                self.active_widget = Some(ActiveWidget::MainEditor);
+                self.editor.set_editor_style(EditorStyle::Active);
+                self.composite_editor.set_active_editor(None);
+            }
+            ActiveWidget::CompositeEditor => {
+                self.active_widget = Some(ActiveWidget::CompositeEditor);
+                self.editor.set_editor_style(EditorStyle::Inactive);
+                self.composite_editor.set_active_editor(Some(0));
             }
         }
-        self.composite_editor.execute_action(action);
     }
 
-    pub fn handle_editor_event(&mut self, event: KeyEvent) {
+    // pub fn handle_action(&mut self, action: EditorAction) {
+    //     match self.active_widget {
+    //         Some(ActiveWidget::MainEditor) => match action {
+    //             _ => self.editor.execute_action(action),
+    //         },
+    //         Some(ActiveWidget::CompositeEditor) => match action {
+    //             _ => self.composite_editor.execute_action(action),
+    //         },
+    //         None => {}
+    //     }
+    //     match action_clone {
+    //         EditorAction::ApplyInput(_) => {}
+    //         EditorAction::MoveCursor(mvmt) => match mvmt {
+    //             CursorMove::Right
+    //         },
+    //         _ => {
+    //             self.content
+    //                 .push_str(&format!("Handling action: {:?}\n", action_clone));
+    //         }
+    //     }
+    // }
+
+    pub fn handle_key_event_main_editor(&mut self, event: KeyEvent) {
+        let input: Input = event.into();
+        let mode = self.editor.get_mode();
+        let action_opt = if let Some(pending_action) = self.editor.get_pending_action() {
+            match handle_pending_action_input(input, pending_action) {
+                Some(action) => Some(action),
+                None => {
+                    self.editor.set_pending_action(None);
+                    None
+                }
+            }
+        } else {
+            handle_input(input, mode)
+        };
+        match action_opt {
+            Some(action) => match action {
+                EditorAction::ApplyInput(_) => self.editor.execute_action(action),
+                EditorAction::MoveCursor(mvmt) => match mvmt {
+                    CursorMove::Right if self.editor.is_cursor_at_line_end() => {
+                        self.set_active_widget(ActiveWidget::CompositeEditor);
+                    }
+                    _ => self.editor.execute_action(action),
+                },
+                _ => {
+                    self.content
+                        .push_str(&format!("Handling action: {:?}\n", action));
+                    self.editor.execute_action(action)
+                }
+            },
+            None => {}
+        }
+    }
+
+    pub fn handle_key_event_composite_editor(&mut self, event: KeyEvent) {
         let input: Input = event.into();
         if let Some(mode) = self.composite_editor.get_mode() {
             let action_opt =
@@ -116,9 +175,31 @@ impl UserInterface {
                     handle_input(input, mode)
                 };
             match action_opt {
-                Some(action) => self.handle_action(action),
+                Some(action) => match action {
+                    EditorAction::ApplyInput(_) => self.composite_editor.execute_action(action),
+                    EditorAction::MoveCursor(mvmt) => match mvmt {
+                        CursorMove::Left if self.composite_editor.is_cursor_at_line_start() => {
+                            self.set_active_widget(ActiveWidget::MainEditor);
+                        }
+                        _ => self.composite_editor.execute_action(action),
+                    },
+                    _ => {
+                        self.content
+                            .push_str(&format!("Handling action: {:?}\n", action));
+                        self.composite_editor.execute_action(action)
+                    }
+                },
                 None => {}
             }
+        }
+    }
+
+    pub fn handle_key_event(&mut self, event: KeyEvent) {
+        match self.active_widget {
+            Some(ActiveWidget::MainEditor) => self.handle_key_event_main_editor(event),
+            Some(ActiveWidget::CompositeEditor) => self.handle_key_event_composite_editor(event),
+            // Some(ActiveWidget::TaskList) => {}
+            None => {}
         }
     }
 
@@ -128,6 +209,7 @@ impl UserInterface {
             if main_chunks[0].contains(pos) {
                 let content_chunks = content_chunks(main_chunks[0]);
                 if content_chunks[1].contains(pos) {
+                    self.set_active_widget(ActiveWidget::MainEditor);
                     let local_pos = Position {
                         x: pos.x.saturating_sub(content_chunks[1].x),
                         y: pos.y.saturating_sub(content_chunks[1].y),
@@ -136,15 +218,13 @@ impl UserInterface {
                         .push_str(&format!("Main editor click: {:?}\n", pos));
                     self.editor.on_click(local_pos);
                 } else if content_chunks[2].contains(pos) {
+                    self.set_active_widget(ActiveWidget::CompositeEditor);
                     self.content
                         .push_str(&format!("Composite editor click: {:?}\n", pos));
                     self.composite_editor.on_click(pos);
                 }
             }
         }
-        // let content_chunks = content_chunks(main_chunks[0]);
-        // self.mouse_clicked = Some((x, y));
-        // self.composite_editor.set_active_editor_at_position(x, y);
     }
 
     pub fn draw(&mut self, f: &mut Frame, area: Rect) -> Result<()> {

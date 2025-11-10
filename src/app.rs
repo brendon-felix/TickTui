@@ -92,14 +92,14 @@ impl TickTui {
                 Some(EditorMode::Normal) => tx.send(Action::Quit)?,
                 None => match self.ui.get_main_editor_mode() {
                     EditorMode::Normal => tx.send(Action::Quit)?,
-                    _ => self.ui.handle_editor_event(key),
+                    _ => self.ui.handle_key_event(key),
                 },
-                _ => self.ui.handle_editor_event(key),
+                _ => self.ui.handle_key_event(key),
             },
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 tx.send(Action::Quit)?
             }
-            _ => self.ui.handle_editor_event(key),
+            _ => self.ui.handle_key_event(key),
         }
         Ok(())
     }

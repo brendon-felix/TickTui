@@ -34,6 +34,13 @@ pub enum EditorMode {
     Visual(VisualMode),
 }
 
+pub enum EditorStyle {
+    Active,
+    Inactive,
+    // Valid,
+    // Invalid,
+}
+
 impl fmt::Display for EditorMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
