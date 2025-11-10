@@ -5,6 +5,8 @@ use ratatui::{
 };
 use tui_textarea::CursorMove;
 
+use crate::editor::EditorStyle;
+
 use super::{Editor, EditorAction, EditorActions, EditorMode, EditorPendingAction};
 #[allow(dead_code)]
 pub struct CompositeEditor {
@@ -84,6 +86,24 @@ impl CompositeEditor {
             editor.is_cursor_at_line_start()
         } else {
             false
+        }
+    }
+
+    pub fn style_all_inactive(&mut self) {
+        self.editors.iter_mut().for_each(|editor| {
+            editor.set_editor_style(EditorStyle::Inactive);
+        });
+    }
+
+    pub fn restyle_active(&mut self) {
+        if let Some(active_index) = self.active_index {
+            self.editors.iter_mut().enumerate().for_each(|(i, editor)| {
+                if i == active_index {
+                    editor.set_editor_style(EditorStyle::Active);
+                } else {
+                    editor.set_editor_style(EditorStyle::Inactive);
+                }
+            });
         }
     }
 }

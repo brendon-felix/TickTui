@@ -62,7 +62,7 @@ impl UserInterface {
             Constraint::Min(3),
         ];
         let mut composite_editor = CompositeEditor::new(composite_editors, constraints);
-        composite_editor.set_active_editor(None);
+        composite_editor.style_all_inactive();
         let editor = Editor::default()
             .with_title("Main Editor")
             .with_content(EDITOR_CONTENT)
@@ -94,12 +94,12 @@ impl UserInterface {
             ActiveWidget::MainEditor => {
                 self.active_widget = Some(ActiveWidget::MainEditor);
                 self.editor.set_editor_style(EditorStyle::Active);
-                self.composite_editor.set_active_editor(None);
+                self.composite_editor.style_all_inactive();
             }
             ActiveWidget::CompositeEditor => {
                 self.active_widget = Some(ActiveWidget::CompositeEditor);
                 self.editor.set_editor_style(EditorStyle::Inactive);
-                self.composite_editor.set_active_editor(Some(0));
+                self.composite_editor.restyle_active();
             }
         }
     }
