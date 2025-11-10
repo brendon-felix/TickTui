@@ -128,11 +128,13 @@ impl UserInterface {
             if main_chunks[0].contains(pos) {
                 let content_chunks = content_chunks(main_chunks[0]);
                 if content_chunks[1].contains(pos) {
-                    if let Some(local) = get_local_position(pos, content_chunks[1]) {
-                        self.content
-                            .push_str(&format!("Main editor click: {:?}\n", local));
-                        self.editor.on_click(local);
-                    }
+                    let local_pos = Position {
+                        x: pos.x.saturating_sub(area.x),
+                        y: pos.y.saturating_sub(area.y),
+                    };
+                    self.content
+                        .push_str(&format!("Main editor click: {:?}\n", pos));
+                    self.editor.on_click(local_pos);
                 } else if content_chunks[2].contains(pos) {
                     self.content
                         .push_str(&format!("Composite editor click: {:?}\n", pos));
@@ -208,13 +210,6 @@ fn content_chunks(area: Rect) -> Vec<Rect> {
         ])
         .split(area)
         .to_vec()
-}
-
-fn get_local_position(global: Position, area: Rect) -> Option<Position> {
-    area.contains(global).then(|| Position {
-        x: global.x.saturating_sub(area.x),
-        y: global.y.saturating_sub(area.y),
-    })
 }
 
 // fn popup_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

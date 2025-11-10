@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Position, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     widgets::{Borders, Widget, WidgetRef},
 };
 use tui_textarea::CursorMove;
@@ -42,7 +42,7 @@ impl CompositeEditor {
                 editor.set_block(create_block(editor.get_title(), is_active, borders))
             } else {
                 editor.set_cursor_style(cursor_style(editor.get_mode(), false));
-                editor.set_style(Style::default().fg(Color::DarkGray));
+                editor.set_style(Style::default().add_modifier(Modifier::DIM));
                 let is_active = false;
                 let borders = Borders::ALL;
                 editor.set_block(create_block(editor.get_title(), is_active, borders))
