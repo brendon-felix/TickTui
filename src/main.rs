@@ -1,6 +1,5 @@
 mod app;
 // mod auth;
-mod editor;
 mod term;
 mod ui;
 // mod utils;
@@ -27,7 +26,7 @@ async fn main() {
 // }
 
 async fn run() -> Result<()> {
-    let mut app = app::TickTui::new()?;
+    let mut app = app::App::new()?;
     app.run().await?;
     Ok(())
 }

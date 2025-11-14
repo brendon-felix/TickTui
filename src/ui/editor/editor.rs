@@ -2,11 +2,9 @@ use ratatui::{
     buffer::Buffer,
     layout::{Position, Rect},
     style::{Modifier, Style},
-    widgets::{Block, Borders, Widget, WidgetRef},
+    widgets::{Block, Widget, WidgetRef},
 };
 use tui_textarea::{CursorMove, TextArea};
-
-use crate::editor::{EditorStyle, create_block};
 
 use super::{
     EditorAction, EditorActions, EditorMode, EditorPendingAction, TextObject, TextObjectModifier,
@@ -14,25 +12,26 @@ use super::{
 };
 
 #[allow(dead_code)]
-pub struct EditorState {
+pub struct EditorWidgetState {
     mode: EditorMode,
     pending_action: Option<EditorPendingAction>,
     yank_type: Option<TextObject>,
 }
 
 #[allow(dead_code)]
-pub struct Editor {
+pub struct EditorWidget {
     title: Option<String>,
-    state: EditorState,
+    state: EditorWidgetState,
     textarea: TextArea<'static>,
     single_line: bool,
     validator: Option<Box<dyn Fn(&TextArea) -> bool>>,
     current_block: Option<Block<'static>>,
+    last_area_pos: Option<Position>,
 }
 
-impl Default for Editor {
+impl Default for EditorWidget {
     fn default() -> Self {
-        let state = EditorState {
+        let state = EditorWidgetState {
             mode: EditorMode::Normal,
             pending_action: None,
             yank_type: None,
@@ -48,12 +47,13 @@ impl Default for Editor {
             single_line: false,
             validator: None,
             current_block: None,
+            last_area_pos: None,
         }
     }
 }
 
 #[allow(dead_code)]
-impl Editor {
+impl EditorWidget {
     pub fn with_title(mut self, title: &str) -> Self {
         self.title = Some(title.to_string());
         self
@@ -134,6 +134,10 @@ impl Editor {
         self
     }
 
+    pub fn insert_str(&mut self, s: String) {
+        let _ = self.textarea.insert_str(s);
+    }
+
     pub fn get_title(&self) -> Option<String> {
         self.title.clone()
     }
@@ -154,15 +158,6 @@ impl Editor {
         self.textarea.lines()
     }
 
-    pub fn on_click(&mut self, local_pos: Position) {
-        let (x, y) = if let Some(_block) = &self.current_block {
-            (local_pos.x.saturating_sub(1), local_pos.y.saturating_sub(1))
-        } else {
-            local_pos.into()
-        };
-        self.textarea.move_cursor(CursorMove::Jump(y, x));
-    }
-
     pub fn is_cursor_at_line_end(&self) -> bool {
         let (row, col) = self.textarea.cursor();
         if let Some(line) = self.textarea.lines().get(row) {
@@ -175,25 +170,6 @@ impl Editor {
     pub fn is_cursor_at_line_start(&self) -> bool {
         let (_row, col) = self.textarea.cursor();
         col == 0
-    }
-
-    pub fn set_editor_style(&mut self, style: EditorStyle) {
-        match style {
-            EditorStyle::Active => {
-                let is_active = true;
-                self.set_cursor_style(cursor_style(self.get_mode(), is_active));
-                self.set_style(Style::default());
-                let borders = Borders::ALL;
-                self.set_block(create_block(self.get_title(), is_active, borders))
-            }
-            EditorStyle::Inactive => {
-                let is_active = false;
-                self.set_cursor_style(cursor_style(self.get_mode(), is_active));
-                self.set_style(Style::default().add_modifier(Modifier::DIM));
-                let borders = Borders::ALL;
-                self.set_block(create_block(self.get_title(), is_active, borders))
-            }
-        }
     }
 }
 
@@ -243,7 +219,7 @@ fn select_current_paragraph(
     (current_row, current_col)
 }
 
-impl EditorActions for Editor {
+impl EditorActions for EditorWidget {
     #[rustfmt::skip]
     fn execute_action(&mut self, action: EditorAction) {
         let mut pending = false;
@@ -453,13 +429,53 @@ impl EditorActions for Editor {
     }
 }
 
-impl Widget for Editor {
+// impl AppWidget for EditorWidget {
+//     fn set_widget_style(&mut self, style: WidgetStyle) {
+//         match style {
+//             WidgetStyle::Active => {
+//                 let is_active = true;
+//                 self.set_cursor_style(cursor_style(self.get_mode(), is_active));
+//                 self.set_style(Style::default());
+//                 let borders = Borders::ALL;
+//                 self.set_block(create_block(self.get_title(), is_active, borders))
+//             }
+//             WidgetStyle::Inactive => {
+//                 let is_active = false;
+//                 self.set_cursor_style(cursor_style(self.get_mode(), is_active));
+//                 self.set_style(Style::default().add_modifier(Modifier::DIM));
+//                 let borders = Borders::ALL;
+//                 self.set_block(create_block(self.get_title(), is_active, borders))
+//             }
+//         }
+//     }
+
+//     fn on_click(&mut self, pos: Position) {
+//         if let Some(area_pos) = self.last_area_pos {
+//             let local = Position::new(
+//                 pos.x.saturating_sub(area_pos.x),
+//                 pos.y.saturating_sub(area_pos.y),
+//             );
+//             let (x, y) = if let Some(_block) = &self.current_block {
+//                 (local.x.saturating_sub(1), local.y.saturating_sub(1))
+//             } else {
+//                 local.into()
+//             };
+//             self.textarea.move_cursor(CursorMove::Jump(y, x));
+//         }
+//     }
+
+//     fn set_last_area_pos(&mut self, area_pos: Position) {
+//         self.last_area_pos = Some(area_pos);
+//     }
+// }
+
+impl Widget for EditorWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.textarea.render(area, buf);
     }
 }
 
-impl WidgetRef for Editor {
+impl WidgetRef for EditorWidget {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         self.textarea.clone().render(area, buf);
     }

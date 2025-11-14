@@ -1,36 +1,30 @@
 use crate::{
-    editor::EditorMode,
-    term::{self, TerminalInterface},
-    ui::UserInterface,
+    term::{self, AppTerminal},
+    ui::AppUI,
 };
 
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use ratatui::layout::Position;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 // use std::sync::Arc;
 // use ticks::TickTick;
 use tokio::sync::mpsc::{self, UnboundedSender};
-// use tui_text::EditorMode;
 
 enum Action {
     Tick,
     Render,
     Resize(u16, u16),
-    Click(Position),
     Quit,
     // Error(String),
-    // RefreshTasks,
-    // Interact(UserInteraction),
 }
 
-pub struct TickTui {
+pub struct App {
     // client: Arc<TickTick>,
-    ti: TerminalInterface,
-    ui: UserInterface,
+    ti: AppTerminal,
+    ui: AppUI,
     quitting: bool,
 }
 
-impl TickTui {
+impl App {
     // pub fn new(client: Arc<TickTick>) -> Result<Self> {
     //     let ti = TerminalInterface::new()?;
     //     let ui = UserInterface::new();
@@ -44,8 +38,8 @@ impl TickTui {
     // }
 
     pub fn new() -> Result<Self> {
-        let ti = TerminalInterface::new()?;
-        let ui = UserInterface::new();
+        let ti = AppTerminal::new()?;
+        let ui = AppUI::new();
         let quitting = false;
         Ok(Self { ti, ui, quitting })
     }
@@ -86,39 +80,33 @@ impl TickTui {
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key: KeyEvent, tx: &UnboundedSender<Action>) -> Result<()> {
-        match key.code {
-            KeyCode::Char('q') => match self.ui.get_composite_editor_mode() {
-                Some(EditorMode::Normal) => tx.send(Action::Quit)?,
-                None => match self.ui.get_main_editor_mode() {
-                    EditorMode::Normal => tx.send(Action::Quit)?,
-                    _ => self.ui.handle_key_event(key),
-                },
-                _ => self.ui.handle_key_event(key),
-            },
-            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+    fn handle_key_event(
+        &mut self,
+        key_event: KeyEvent,
+        tx: &UnboundedSender<Action>,
+    ) -> Result<()> {
+        match key_event.code {
+            KeyCode::Char('q') => {
+                if self.ui.is_quittable() {
+                    tx.send(Action::Quit)?;
+                } else {
+                    self.ui.handle_key_event(key_event);
+                }
+            }
+            KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 tx.send(Action::Quit)?
             }
-            _ => self.ui.handle_key_event(key),
+            _ => self.ui.handle_key_event(key_event),
         }
         Ok(())
     }
 
     fn handle_mouse_event(
         &mut self,
-        mouse: MouseEvent,
-        tx: &UnboundedSender<Action>,
+        mouse_event: MouseEvent,
+        _tx: &UnboundedSender<Action>,
     ) -> Result<()> {
-        match mouse.kind {
-            MouseEventKind::Down(button) => match button {
-                MouseButton::Left => tx.send(Action::Click(Position {
-                    x: mouse.column,
-                    y: mouse.row,
-                }))?,
-                _ => {}
-            },
-            _ => {}
-        }
+        self.ui.handle_mouse_event(mouse_event);
         Ok(())
     }
 
@@ -127,7 +115,7 @@ impl TickTui {
             Action::Tick => {}
             Action::Render => self.render()?,
             Action::Resize(w, h) => self.ti.resize(w, h)?,
-            Action::Click(pos) => self.ui.handle_mouse_click(pos),
+            // Action::Click(pos) => self.ui.handle_mouse_event(pos),
             Action::Quit => self.quitting = true,
             // Action::Error(msg) => self.error(msg),
             // _ => {}

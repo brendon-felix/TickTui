@@ -975,7 +975,9 @@ fn move_to_field_with_column_preservation(
     }
 }
 
-pub struct CompositeEditor {
+pub struct Editor {}
+
+pub struct CompositeEditorWidget {
     textareas: Vec<TextArea<'static>>,
 }
 

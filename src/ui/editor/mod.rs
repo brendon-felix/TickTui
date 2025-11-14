@@ -34,13 +34,6 @@ pub enum EditorMode {
     Visual(VisualMode),
 }
 
-pub enum EditorStyle {
-    Active,
-    Inactive,
-    // Valid,
-    // Invalid,
-}
-
 impl fmt::Display for EditorMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
@@ -59,7 +52,7 @@ mod handlers;
 mod helpers;
 
 pub use actions::{EditorAction, EditorActions, EditorPendingAction};
-pub use composite::CompositeEditor;
-pub use editor::Editor;
+pub use composite::CompositeEditorWidget;
+pub use editor::EditorWidget;
 pub use handlers::{handle_input, handle_pending_action_input};
 pub use helpers::{create_block, cursor_style, is_movement_key, match_movement_key};

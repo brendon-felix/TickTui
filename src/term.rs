@@ -40,7 +40,7 @@ pub enum Event {
     Resize(u16, u16),
 }
 
-pub struct TerminalInterface {
+pub struct AppTerminal {
     terminal: Terminal<Backend<Stdout>>,
     task: JoinHandle<()>,
     cancellation_token: CancellationToken,
@@ -48,7 +48,7 @@ pub struct TerminalInterface {
     event_tx: UnboundedSender<Event>,
 }
 
-impl TerminalInterface {
+impl AppTerminal {
     pub fn new() -> Result<Self> {
         let terminal = Terminal::new(Backend::new(stdout()))?;
         let (event_tx, event_rx) = mpsc::unbounded_channel();
@@ -158,6 +158,7 @@ impl TerminalInterface {
             crossterm::execute!(stdout(), DisableMouseCapture)?;
             crossterm::terminal::disable_raw_mode()?;
         }
+        // let _ = ratatui::try_restore();
         Ok(())
     }
 
@@ -189,7 +190,7 @@ impl TerminalInterface {
     }
 }
 
-impl Drop for TerminalInterface {
+impl Drop for AppTerminal {
     fn drop(&mut self) {
         let _ = self.exit();
     }
