@@ -39,7 +39,7 @@ pub struct CompositeEditor {
     pub editors: Vec<Editor>,
     active_index: Option<usize>,
     constraints: Vec<Constraint>,
-    last_area_pos: Option<Position>,
+    // last_area_pos: Option<Position>,
 }
 
 #[allow(dead_code)]
@@ -50,7 +50,7 @@ impl CompositeEditor {
             editors,
             active_index,
             constraints: vec![],
-            last_area_pos: None,
+            // last_area_pos: None,
         };
         composite.set_active_editor(active_index);
         composite

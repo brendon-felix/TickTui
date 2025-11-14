@@ -1,26 +1,23 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
-    buffer::Buffer,
-    layout::{Position, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
-    text::Line,
-    widgets::{Block, StatefulWidget, Widget},
+    widgets::Block,
 };
-use tokio::task;
 
 use crate::{
     // ui::editor::create_block,
-    ui::multiselect::{MultiSelectList, MultiSelectListItem, MultiSelectListState},
+    ui::multiselect::{MultiSelectList, MultiSelectListState},
     // ui::{AppWidget, WidgetStyle},
 };
 
-const ITEM_HEIGHT: u16 = 3;
+// const ITEM_HEIGHT: u16 = 3;
 
-pub enum TaskListMode {
-    Normal,
-    Visual,
-}
+// pub enum TaskListMode {
+//     Normal,
+//     Visual,
+// }
 
 pub struct TaskItem {
     name: String,
@@ -58,6 +55,7 @@ pub struct TaskList {
     pub task_changed: bool,
 }
 
+#[allow(dead_code)]
 impl TaskList {
     pub fn new(tasks: Vec<TaskItem>) -> Self {
         let mut list_state = MultiSelectListState::default();

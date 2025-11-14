@@ -2,8 +2,6 @@ use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    text::Text,
-    widgets::Paragraph,
 };
 
 use crate::ui::{

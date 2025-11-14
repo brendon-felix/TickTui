@@ -2,8 +2,6 @@ use crossterm::event::KeyEvent;
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
-    style::Style,
-    widgets::Block,
 };
 use tui_textarea::{CursorMove, Input};
 

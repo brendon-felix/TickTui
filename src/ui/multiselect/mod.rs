@@ -34,7 +34,6 @@ mod state;
 
 pub struct MultiSelectListItem<'a> {
     content: Text<'a>,
-    selected: bool,
     style: Style,
 }
 
@@ -45,7 +44,6 @@ impl<'a> MultiSelectListItem<'a> {
     {
         Self {
             content: content.into(),
-            selected: false,
             style: Style::default(),
         }
     }
@@ -273,7 +271,7 @@ impl MultiSelectList<'_> {
 
         // Calculate the last visible index and total height of the items
         // that will fit in the available space
-        for item in self.items.iter().skip(offset) {
+        for _item in self.items.iter().skip(offset) {
             if height_from_offset + ITEM_HEIGHT > (max_height as u16) {
                 break;
             }
@@ -353,7 +351,7 @@ impl MultiSelectList<'_> {
         let mut scroll_padding = self.scroll_padding;
         while scroll_padding > 0 {
             let mut height_around_selected = 0;
-            for index in selected.saturating_sub(scroll_padding)
+            for _index in selected.saturating_sub(scroll_padding)
                 ..=selected
                     .saturating_add(scroll_padding)
                     .min(last_valid_index)

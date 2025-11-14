@@ -3,10 +3,13 @@ use ratatui::{Frame, layout::Rect, text::Text, widgets::Paragraph};
 
 use crate::ui::{focuslist::FocusList, tasklist::TaskItem};
 
+#[allow(dead_code)]
 pub struct FocusModeUI {
     test_content: String,
     focus_list: FocusList<TaskItem>,
 }
+
+#[allow(dead_code)]
 impl FocusModeUI {
     pub fn new() -> Self {
         Self {

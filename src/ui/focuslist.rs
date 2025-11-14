@@ -5,6 +5,7 @@ pub struct FocusList<T> {
     focused_index: Option<usize>,
 }
 
+#[allow(dead_code)]
 impl<T> FocusList<T> {
     pub fn new() -> Self {
         Self {
