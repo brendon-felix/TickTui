@@ -12,6 +12,26 @@ const ITEM_HEIGHT: u16 = 3;
 
 mod state;
 
+// fn popup_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+//     let popup_layout = Layout::default()
+//         .direction(ratatui::layout::Direction::Vertical)
+//         .constraints([
+//             Constraint::Percentage((100 - percent_y) / 2),
+//             Constraint::Percentage(percent_y),
+//             Constraint::Percentage((100 - percent_y) / 2),
+//         ])
+//         .split(r);
+
+//     Layout::default()
+//         .direction(ratatui::layout::Direction::Horizontal)
+//         .constraints([
+//             Constraint::Percentage((100 - percent_x) / 2),
+//             Constraint::Percentage(percent_x),
+//             Constraint::Percentage((100 - percent_x) / 2),
+//         ])
+//         .split(popup_layout[1])[1]
+// }
+
 pub struct MultiSelectListItem<'a> {
     content: Text<'a>,
     selected: bool,
@@ -70,9 +90,18 @@ impl<'a> MultiSelectList<'a> {
         self
     }
 
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
     pub fn with_highlight_style(mut self, style: Style) -> Self {
         self.highlight_style = style;
         self
+    }
+
+    pub fn set_style(&mut self, style: Style) {
+        self.style = style;
     }
 
     pub fn len(&self) -> usize {

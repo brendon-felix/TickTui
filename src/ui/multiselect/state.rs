@@ -43,6 +43,14 @@ impl MultiSelectListState {
         }
     }
 
+    pub fn is_in_visual_mode(&self) -> bool {
+        self.visual_start.is_some()
+    }
+
+    pub fn get_visual_start(&self) -> Option<usize> {
+        self.visual_start
+    }
+
     pub fn end_visual_selection(&mut self) {
         if self.visual_start.is_some() {
             self.visual_start = None;

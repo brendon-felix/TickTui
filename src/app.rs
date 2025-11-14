@@ -87,10 +87,10 @@ impl App {
     ) -> Result<()> {
         match key_event.code {
             KeyCode::Char('q') => {
-                if self.ui.is_quittable() {
-                    tx.send(Action::Quit)?;
-                } else {
+                if self.ui.is_in_insert_mode() {
                     self.ui.handle_key_event(key_event);
+                } else {
+                    tx.send(Action::Quit)?;
                 }
             }
             KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -125,7 +125,7 @@ impl App {
 
     fn render(&mut self) -> Result<()> {
         self.ti.draw(|f| {
-            let _ = self.ui.draw(f, f.area());
+            self.ui.draw(f, f.area());
         })?;
         Ok(())
     }

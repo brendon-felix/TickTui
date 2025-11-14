@@ -1,13 +1,16 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
+    Frame,
     buffer::Buffer,
     layout::{Position, Rect},
     style::{Color, Modifier, Style},
     text::Line,
-    widgets::{Block, Borders, StatefulWidget},
+    widgets::{Block, StatefulWidget, Widget},
 };
+use tokio::task;
 
 use crate::{
-    ui::editor::create_block,
+    // ui::editor::create_block,
     ui::multiselect::{MultiSelectList, MultiSelectListItem, MultiSelectListState},
     // ui::{AppWidget, WidgetStyle},
 };
@@ -19,45 +22,91 @@ pub enum TaskListMode {
     Visual,
 }
 
-pub struct Task {
+pub struct TaskItem {
     name: String,
+    description: String,
 }
 
-impl Task {
+impl TaskItem {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
+            description: String::new(),
         }
+    }
+
+    pub fn with_description(mut self, description: &str) -> Self {
+        self.description = description.to_string();
+        self
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get_description(&self) -> &str {
+        &self.description
     }
 }
 
-// #[derive(Default)]
-// pub struct TaskListStyle {
-//     selected: Style,
-//     unselected: Style,
-// }
-
 #[derive(Default)]
 pub struct TaskList {
-    tasks: Vec<Task>,
-    pub list_state: MultiSelectListState,
-    current_block: Option<Block<'static>>,
-    title: Option<String>,
-    // style: TaskListStyle,
+    tasks: Vec<TaskItem>,
+    list_state: MultiSelectListState,
     style: Style,
-    last_area_pos: Option<Position>,
+    current_block: Option<Block<'static>>,
+    pub task_changed: bool,
 }
 
 impl TaskList {
-    pub fn with_tasks(mut self, tasks: Vec<Task>) -> Self {
+    pub fn new(tasks: Vec<TaskItem>) -> Self {
+        let mut list_state = MultiSelectListState::default();
+        list_state.select(Some(0));
+        let current_block = Some(
+            Block::default()
+                .title("Tasks")
+                .borders(ratatui::widgets::Borders::ALL),
+        );
+        Self {
+            tasks,
+            list_state,
+            style: Style::default(),
+            current_block,
+            task_changed: true,
+        }
+    }
+
+    pub fn activate(&mut self) {
+        if self.tasks.is_empty() {
+            self.list_state.select(None);
+        } else if self.list_state.selected().is_none() {
+            self.list_state.select(Some(0));
+        }
+        self.current_block = Some(
+            Block::default()
+                .title("Tasks")
+                .borders(ratatui::widgets::Borders::ALL),
+        );
+        self.style = Style::default();
+    }
+
+    pub fn deactivate(&mut self) {
+        self.current_block = Some(
+            Block::default()
+                .title("Tasks")
+                .borders(ratatui::widgets::Borders::ALL)
+                .style(Style::default().add_modifier(Modifier::DIM)),
+        );
+        self.style = Style::default().add_modifier(Modifier::DIM);
+    }
+
+    pub fn with_tasks(mut self, tasks: Vec<TaskItem>) -> Self {
         self.tasks = tasks;
         self
     }
 
     pub fn add_task(&mut self, name: &str) {
-        self.tasks.push(Task {
-            name: name.to_string(),
-        });
+        self.tasks.push(TaskItem::new(name));
     }
 
     pub fn remove_task(&mut self, index: usize) {
@@ -84,10 +133,10 @@ impl TaskList {
                 self.remove_range_inclusive((s, e));
                 // self.list_state.select_next();
                 self.list_state.select(Some(s));
-                self.list_state.visual_start = None;
+                self.list_state.end_visual_selection();
             } else {
                 self.remove_task(curr);
-                self.list_state.select(None);
+                self.list_state.select(Some(curr));
             }
         }
     }
@@ -96,11 +145,7 @@ impl TaskList {
         self.current_block = Some(block);
     }
 
-    pub fn set_style(&mut self, style: Style) {
-        self.style = style;
-    }
-
-    pub fn get_tasks(&self) -> &Vec<Task> {
+    pub fn get_tasks(&self) -> &Vec<TaskItem> {
         &self.tasks
     }
 
@@ -108,8 +153,55 @@ impl TaskList {
         &self.list_state
     }
 
-    pub fn get_title_owned(&self) -> Option<String> {
-        self.title.clone()
+    pub fn get_current_task(&self) -> Option<&TaskItem> {
+        if let Some(idx) = self.list_state.selected() {
+            self.tasks.get(idx)
+        } else {
+            None
+        }
+    }
+
+    pub fn handle_key_event(&mut self, key: KeyEvent) {
+        let idx = self.list_state.selected();
+        if self.list_state.is_in_visual_mode() {
+            match key.code {
+                KeyCode::Char('j') | KeyCode::Down => self.list_state.select_next(),
+                KeyCode::Char('k') | KeyCode::Up => self.list_state.select_previous(),
+                KeyCode::Char('g') => self.list_state.select_first(),
+                KeyCode::Char('G') => self.list_state.select_last(),
+                KeyCode::Char('d') => self.remove_selected_tasks(),
+                KeyCode::Esc => self.list_state.end_visual_selection(),
+                _ => {}
+            }
+            return;
+        } else {
+            match key.code {
+                KeyCode::Char('j') | KeyCode::Down => self.list_state.select_next(),
+                KeyCode::Char('k') | KeyCode::Up => self.list_state.select_previous(),
+                KeyCode::Char('g') => self.list_state.select_first(),
+                KeyCode::Char('G') => self.list_state.select_last(),
+                KeyCode::Char('v') | KeyCode::Char('V') => self.list_state.start_visual_selection(),
+                KeyCode::Char('d') => self.remove_selected_tasks(),
+                _ => {}
+            }
+        }
+        self.task_changed = idx != self.list_state.selected();
+    }
+
+    pub fn draw(&mut self, f: &mut Frame, area: Rect) {
+        let items: Vec<String> = self.tasks.iter().map(|task| task.name.clone()).collect();
+        let mut task_list = MultiSelectList::new(items)
+            .with_style(self.style)
+            .with_highlight_style(
+                Style::new()
+                    .bg(Color::Rgb(50, 50, 50))
+                    .add_modifier(Modifier::BOLD),
+            );
+
+        if let Some(block) = self.current_block.clone() {
+            task_list = task_list.with_block(block);
+        }
+        f.render_stateful_widget(task_list, area, &mut self.list_state);
     }
 }
 
@@ -153,47 +245,3 @@ impl TaskList {
 //         }
 //     }
 // }
-
-// impl Widget for TaskList {
-//     fn render(self, area: Rect, buf: &mut Buffer) {
-//         let items: Vec<String> = self.tasks.iter().map(|task| task.name.clone()).collect();
-//         let mut task_list = List::default().scroll_padding(2).items(items);
-//         if let Some(block) = self.current_block {
-//             task_list = task_list.block(block);
-//         }
-//         task_list.render(area, buf);
-//     }
-// }
-
-// impl WidgetRef for TaskList {
-//     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
-//         let items: Vec<String> = self.tasks.iter().map(|task| task.name.clone()).collect();
-//         let mut task_list = List::default().scroll_padding(2).items(items);
-//         if let Some(block) = self.current_block.clone() {
-//             task_list = task_list.block(block);
-//         }
-//         task_list.render(area, buf);
-//     }
-// }
-
-impl StatefulWidget for &mut TaskList {
-    type State = MultiSelectListState;
-
-    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let items: Vec<MultiSelectListItem> = self
-            .tasks
-            .iter()
-            .map(|task| MultiSelectListItem::new(vec![Line::from(task.name.clone())]))
-            .collect();
-        let mut task_list = MultiSelectList::new(items).with_highlight_style(
-            Style::new()
-                .bg(Color::Rgb(50, 50, 50))
-                .add_modifier(Modifier::BOLD),
-        );
-
-        if let Some(block) = self.current_block.clone() {
-            task_list = task_list.with_block(block);
-        }
-        task_list.render(area, buf, state);
-    }
-}

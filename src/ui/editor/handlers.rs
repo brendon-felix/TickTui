@@ -1,9 +1,11 @@
 use tui_textarea::{CursorMove, Input, Key};
 
-use super::{
-    EditorAction, EditorMode, EditorPendingAction, TextObject, TextObjectModifier, VisualMode,
-    is_movement_key, match_movement_key,
+use crate::ui::editor::{
+    actions::{EditorAction, EditorPendingAction},
+    helpers::{is_movement_key, match_movement_key},
 };
+
+use super::{EditorMode, TextObject, TextObjectModifier, VisualMode};
 
 pub fn handle_input(input: Input, mode: EditorMode) -> Option<EditorAction> {
     match mode {
