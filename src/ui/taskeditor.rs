@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Rect},
 };
 use ticks::tasks::Task;
-use tui_textarea::{CursorMove, Input};
+use tui_textarea::Input;
 
 use crate::ui::{
     composite::{CompositeEditor, CompositeEditorState},
