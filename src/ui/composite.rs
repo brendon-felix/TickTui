@@ -1,6 +1,6 @@
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Position, Rect},
+    layout::{Constraint, Layout, Rect},
     widgets::{StatefulWidget, StatefulWidgetRef, Widget},
 };
 use tui_textarea::CursorMove;
@@ -13,24 +13,44 @@ use crate::ui::editor::{
 // use crate::ui::{AppWidget, WidgetStyle};
 
 pub struct CompositeEditorState {
-    position: Position,
-    sub_positions: Vec<Position>,
+    // position: Position,
+    // sub_positions: Vec<Position>,
+    last_area: Rect,
+    sub_areas: Vec<Rect>,
 }
 
 impl CompositeEditorState {
     pub fn new(num_editors: usize) -> Self {
         Self {
-            position: Position::default(),
-            sub_positions: vec![Position::default(); num_editors],
+            // position: Position::default(),
+            // sub_positions: vec![Position::default(); num_editors],
+            last_area: Rect::default(),
+            sub_areas: vec![Rect::default(); num_editors],
         }
     }
 
-    pub fn set_position(&mut self, position: Position) {
-        self.position = position;
+    // pub fn set_position(&mut self, position: Position) {
+    //     self.position = position;
+    // }
+
+    // pub fn set_sub_positions(&mut self, positions: Vec<Position>) {
+    //     self.sub_positions = positions;
+    // }
+
+    // pub fn get_sub_positions(&self) -> &Vec<Position> {
+    //     &self.sub_positions
+    // }
+
+    pub fn set_last_area(&mut self, area: Rect) {
+        self.last_area = area;
     }
 
-    pub fn set_sub_positions(&mut self, positions: Vec<Position>) {
-        self.sub_positions = positions;
+    pub fn set_sub_areas(&mut self, areas: Vec<Rect>) {
+        self.sub_areas = areas;
+    }
+
+    pub fn get_sub_areas(&self) -> &Vec<Rect> {
+        &self.sub_areas
     }
 }
 
@@ -271,7 +291,7 @@ impl StatefulWidget for CompositeEditor {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let chunks = self.create_chunks(area);
-        state.set_sub_positions(chunks.iter().map(|chunk| chunk.as_position()).collect());
+        state.set_sub_areas(chunks.clone());
         for (i, editor) in self.editors.into_iter().enumerate() {
             editor.render(chunks[i], buf);
         }
@@ -283,7 +303,8 @@ impl StatefulWidgetRef for CompositeEditor {
 
     fn render_ref(&self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let chunks = self.create_chunks(area);
-        state.set_sub_positions(chunks.iter().map(|chunk| chunk.as_position()).collect());
+        // state.set_sub_positions(chunks.iter().map(|chunk| chunk.as_position()).collect());
+        state.set_sub_areas(chunks.clone());
         for (i, editor) in self.editors.iter().enumerate() {
             editor.render(chunks[i], buf);
         }
@@ -295,7 +316,8 @@ impl StatefulWidget for &mut CompositeEditor {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let chunks = self.create_chunks(area);
-        state.set_sub_positions(chunks.iter().map(|chunk| chunk.as_position()).collect());
+        // state.set_sub_positions(chunks.iter().map(|chunk| chunk.as_position()).collect());
+        state.set_sub_areas(chunks.clone());
         for (i, editor) in self.editors.iter_mut().enumerate() {
             editor.render(chunks[i], buf);
         }

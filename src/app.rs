@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use crate::{
     tasks::fetch_all_tasks,
@@ -13,7 +16,7 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 
 enum Action {
     Tick,
-    Render,
+    Render(Instant),
     Resize(u16, u16),
     Quit,
     Error(Error),
@@ -104,9 +107,9 @@ impl App {
 
     fn handle_event(&mut self, event: term::Event, tx: &UnboundedSender<Action>) -> Result<()> {
         match event {
-            term::Event::Quit => tx.send(Action::Quit)?,
+            // term::Event::Quit => tx.send(Action::Quit)?,
             term::Event::Tick => tx.send(Action::Tick)?,
-            term::Event::Render => tx.send(Action::Render)?,
+            term::Event::Render(last) => tx.send(Action::Render(last))?,
             term::Event::Resize(w, h) => tx.send(Action::Resize(w, h))?,
             term::Event::Key(key) => self.handle_key_event(key, tx)?,
             term::Event::Mouse(mouse) => self.handle_mouse_event(mouse, tx)?,
@@ -149,7 +152,7 @@ impl App {
     fn execute_action(&mut self, action: Action, tx: &UnboundedSender<Action>) -> Result<()> {
         match action {
             Action::Tick => {}
-            Action::Render => self.render()?,
+            Action::Render(last_frame) => self.render(last_frame)?,
             Action::Resize(w, h) => self.ti.resize(w, h)?,
             Action::Quit => self.quitting = true,
             Action::RefreshTasks => self.refresh_tasks(tx.clone()),
@@ -159,9 +162,9 @@ impl App {
         Ok(())
     }
 
-    fn render(&mut self) -> Result<()> {
+    fn render(&mut self, last_frame: Instant) -> Result<()> {
         self.ti.draw(|f| {
-            self.ui.draw(f, f.area());
+            self.ui.draw(f, f.area(), last_frame);
         })?;
         Ok(())
     }

@@ -1,8 +1,13 @@
+use std::time::Instant;
+
 use crossterm::event::KeyEvent;
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
+    style::Color,
+    widgets::{Block, Borders},
 };
+use tachyonfx::{EffectManager, EffectTimer, Interpolation, Motion, fx};
 use ticks::tasks::Task;
 use tui_textarea::Input;
 
@@ -25,6 +30,7 @@ use crate::ui::{
 pub struct TaskEditor {
     editor: CompositeEditor,
     editor_state: CompositeEditorState,
+    effects: EffectManager<()>,
 }
 
 impl TaskEditor {
@@ -36,9 +42,15 @@ impl TaskEditor {
         let editor_state = CompositeEditorState::new(editors.len());
         let editor = CompositeEditor::new(editors)
             .with_constraints(vec![Constraint::Length(3), Constraint::Min(3)]);
+        let effects: EffectManager<()> = EffectManager::default();
+        // let c = Color::Rgb(25, 25, 25);
+        // let timer = EffectTimer::from_ms(20000, Interpolation::ElasticOut);
+        // let fx = fx::sweep_in(Motion::LeftToRight, 5, 0, c, timer);
+        // effects.add_effect(fx);
         Self {
             editor,
             editor_state,
+            effects,
         }
     }
 
@@ -62,6 +74,21 @@ impl TaskEditor {
     pub fn load_task(&mut self, task: &Task) {
         self.set_title_content(&task.title);
         self.set_description_content(&task.content);
+        self.editor_state
+            .get_sub_areas()
+            .iter()
+            .map(|area| {
+                let inner = Block::default().borders(Borders::ALL).inner(area.clone());
+                fx::sweep_in(
+                    Motion::LeftToRight,
+                    5,
+                    0,
+                    Color::Rgb(25, 25, 25),
+                    EffectTimer::from_ms(500, Interpolation::Linear),
+                )
+                .with_area(inner)
+            })
+            .for_each(|fx| self.effects.add_effect(fx));
     }
 
     pub fn is_in_insert_mode(&self) -> bool {
@@ -96,7 +123,10 @@ impl TaskEditor {
         }
     }
 
-    pub fn draw(&mut self, f: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, f: &mut Frame, area: Rect, last_frame: Instant) {
         f.render_stateful_widget(&mut self.editor, area, &mut self.editor_state);
+        let elapsed = last_frame.elapsed();
+        self.effects
+            .process_effects(elapsed.into(), f.buffer_mut(), area);
     }
 }

@@ -7,7 +7,8 @@ use ratatui::{
     text::Line,
     widgets::{Block, Paragraph},
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
+use tachyonfx::EffectManager;
 use ticks::tasks::Task;
 
 use crate::{
@@ -30,6 +31,7 @@ pub struct TaskList {
     current_block: Option<Block<'static>>,
     pub tasks_loaded: bool,
     pub task_changed: bool,
+    effects: EffectManager<()>,
 }
 
 #[allow(dead_code)]
@@ -41,6 +43,7 @@ impl TaskList {
                 .title("Tasks")
                 .borders(ratatui::widgets::Borders::ALL),
         );
+        let effects: EffectManager<()> = EffectManager::default();
         Self {
             tasks,
             list_state,
@@ -48,6 +51,7 @@ impl TaskList {
             current_block,
             tasks_loaded: false,
             task_changed: true,
+            effects,
         }
     }
 
@@ -191,7 +195,7 @@ impl TaskList {
         self.task_changed = idx != self.list_state.selected();
     }
 
-    pub fn draw(&mut self, f: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, f: &mut Frame, area: Rect, last_frame: Instant) {
         if self.tasks.len() == 0 {
             let msg = if !self.tasks_loaded {
                 "Loading Tasks..."
@@ -231,6 +235,9 @@ impl TaskList {
             task_list = task_list.with_block(block);
         }
         f.render_stateful_widget(task_list, area, &mut self.list_state);
+        let elapsed = last_frame.elapsed();
+        self.effects
+            .process_effects(elapsed.into(), f.buffer_mut(), area);
     }
 }
 

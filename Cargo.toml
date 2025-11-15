@@ -18,3 +18,4 @@ tui-textarea = { path = "/Users/felixb/Projects/tui-textarea" }
 tokio = { version = "1.48.0", features = ["full"] }
 tokio-util = "0.7.17"
 chrono = "0.4.42"
+tachyonfx = "0.20.1"

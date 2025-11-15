@@ -9,11 +9,11 @@ use crossterm::{
 };
 use futures::{FutureExt, StreamExt};
 use ratatui::{Terminal, backend::CrosstermBackend as Backend, layout::Rect};
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 use std::{
     io::{Stdout, Write, stdout},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -24,14 +24,14 @@ use tokio_util::sync::CancellationToken;
 const TICK_RATE: f64 = 4.0;
 const FRAME_RATE: f64 = 60.0;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum Event {
     Init,
-    Quit,
+    // Quit,
     Error,
-    Closed,
+    // Closed,
     Tick,
-    Render,
+    Render(Instant),
     FocusGained,
     FocusLost,
     Paste(String),
@@ -75,6 +75,7 @@ impl AppTerminal {
             let mut tick_interval = tokio::time::interval(tick_delay);
             let mut render_interval = tokio::time::interval(render_delay);
             _event_tx.send(Event::Init).unwrap();
+            let mut last_frame = Instant::now();
             loop {
                 let tick_delay = tick_interval.tick();
                 let render_delay = render_interval.tick();
@@ -119,9 +120,10 @@ impl AppTerminal {
                         _event_tx.send(Event::Tick).unwrap();
                     },
                     _ = render_delay => {
-                        _event_tx.send(Event::Render).unwrap();
+                        _event_tx.send(Event::Render(last_frame)).unwrap();
                     },
                 }
+                last_frame = Instant::now();
             }
         });
     }

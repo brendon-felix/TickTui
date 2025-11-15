@@ -12,7 +12,7 @@ mod tasklist;
 
 use focusmode::FocusModeUI;
 use normalmode::NormalModeUI;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use ticks::tasks::Task;
 
 enum AppUIMode {
@@ -66,10 +66,10 @@ impl AppUI {
         }
     }
 
-    pub fn draw(&mut self, f: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, f: &mut Frame, area: Rect, last_frame: Instant) {
         match self.mode {
             AppUIMode::Focus => self.focus_ui.draw(f, area),
-            AppUIMode::Normal => self.normal_ui.draw(f, area),
+            AppUIMode::Normal => self.normal_ui.draw(f, area, last_frame),
         }
     }
 }

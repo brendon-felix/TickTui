@@ -2,8 +2,11 @@ use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    widgets::{Block, Clear, Widget},
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
+use tachyonfx::{EffectManager, EffectTimer, Interpolation, Motion, fx};
 use ticks::tasks::Task;
 
 use crate::{
@@ -20,6 +23,7 @@ pub struct NormalModeUI {
     task_list: TaskList,
     task_editor: TaskEditor,
     active_pane: ActivePane,
+    effects: EffectManager<()>,
 }
 impl NormalModeUI {
     pub fn new() -> Self {
@@ -27,10 +31,16 @@ impl NormalModeUI {
         task_list.activate();
         let mut task_editor = TaskEditor::new();
         task_editor.deactivate();
+        let mut effects: EffectManager<()> = EffectManager::default();
+        let c = Color::Rgb(25, 25, 25);
+        let timer = EffectTimer::from_ms(500, Interpolation::Linear);
+        let fx = fx::sweep_in(Motion::UpToDown, 10, 0, c, timer);
+        effects.add_effect(fx);
         Self {
             task_list,
             task_editor,
             active_pane: ActivePane::TaskList,
+            effects,
         }
     }
 
@@ -83,7 +93,11 @@ impl NormalModeUI {
         // Handle mouse events specific to Normal Mode here
     }
 
-    pub fn draw(&mut self, f: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, f: &mut Frame, area: Rect, last_frame: Instant) {
+        Clear.render(f.area(), f.buffer_mut());
+        Block::default()
+            .style(Style::default().bg(Color::Rgb(25, 25, 25)))
+            .render(f.area(), f.buffer_mut());
         let main_area = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
@@ -106,7 +120,10 @@ impl NormalModeUI {
             vec![Constraint::Percentage(50), Constraint::Percentage(50)],
         )
         .split(main_area);
-        self.task_list.draw(f, chunks[0]);
-        self.task_editor.draw(f, chunks[1]);
+        self.task_list.draw(f, chunks[0], last_frame);
+        self.task_editor.draw(f, chunks[1], last_frame);
+        let elapsed = last_frame.elapsed();
+        self.effects
+            .process_effects(elapsed.into(), f.buffer_mut(), main_area);
     }
 }
