@@ -11,7 +11,7 @@ use std::sync::Arc;
 use ticks::tasks::Task;
 
 use crate::{
-    tasks::is_overdue,
+    tasks::{is_due_today, is_overdue},
     ui::multiselect::{MultiSelectList, MultiSelectListItem, MultiSelectListState},
 };
 
@@ -229,11 +229,12 @@ impl TaskList {
 }
 
 fn create_list_item(task: &Arc<Task>) -> MultiSelectListItem<'static> {
+    let now = chrono::Local::now();
+    let is_today = is_due_today(now, task);
     let line1 = Line::from("");
     let line2 = Line::from(task.title.clone());
-    let line3 = if let Some(date_str) = format_date(&task.due_date, task.is_all_day) {
+    let line3 = if let Some(date_str) = format_date(&task.due_date, task.is_all_day, is_today) {
         let mut line = Line::from(date_str);
-        let now = chrono::Local::now();
         if is_overdue(now, task) {
             line = line.style(Style::default().fg(Color::Red).dim());
         } else {
@@ -246,15 +247,16 @@ fn create_list_item(task: &Arc<Task>) -> MultiSelectListItem<'static> {
     MultiSelectListItem::new(vec![line1, line2, line3])
 }
 
-fn format_date(dt: &DateTime<Utc>, is_all_day: bool) -> Option<String> {
+fn format_date(dt: &DateTime<Utc>, is_all_day: bool, is_today: bool) -> Option<String> {
     if dt.timestamp() == 0 {
         None
     } else {
         let local: DateTime<Local> = dt.with_timezone(&Local);
-        if is_all_day {
-            Some(local.format("%m/%d/%Y").to_string())
-        } else {
-            Some(local.format("%m/%d/%Y %I:%M %p").to_string())
+        match (is_today, is_all_day) {
+            (true, true) => Some("Today".to_string()),
+            (true, false) => Some(local.format("Today %I:%M %p").to_string()),
+            (false, true) => Some(local.format("%m/%d/%Y").to_string()),
+            (false, false) => Some(local.format("%m/%d/%Y %I:%M %p").to_string()),
         }
     }
 }
