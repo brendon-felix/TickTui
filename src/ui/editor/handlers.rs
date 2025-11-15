@@ -73,6 +73,15 @@ fn handle_normal_mode_input(input: Input) -> Option<EditorAction> {
             EditorAction::Insert(TextObject::Line),
             EditorAction::SetMode(EditorMode::Insert),
         ])),
+        Input {
+            key: Key::Enter,
+            ctrl: false,
+            alt: false,
+            shift: false,
+        } => Some(EditorAction::MultiAction(vec![
+            EditorAction::MoveCursor(CursorMove::Down),
+            EditorAction::MoveCursor(CursorMove::Head),
+        ])),
 
         // Normal mode editing commands
         Input {

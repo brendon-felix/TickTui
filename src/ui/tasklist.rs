@@ -100,6 +100,12 @@ impl TaskList {
         if self.tasks.is_empty() {
             self.list_state.select(None);
         }
+        if self.list_state.selected().is_none() && !self.tasks.is_empty() {
+            self.list_state.select(Some(0));
+            self.task_changed = true;
+        } else if self.tasks.is_empty() {
+            self.list_state.select(None);
+        }
     }
 
     pub fn add_task(&mut self, _task: Arc<Task>) {

@@ -164,6 +164,11 @@ impl EditorActions for CompositeEditor {
                         cursor_movement = Some((editor.get_desired_column(), CursorMove::Bottom));
                         self.set_active_editor(Some(num_editors - 1));
                     }
+                    EditorAction::MultiAction(actions) => {
+                        for act in actions {
+                            self.execute_action(act);
+                        }
+                    }
                     _ => editor.execute_action(action),
                 }
             };

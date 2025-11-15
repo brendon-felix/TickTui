@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout},
-    style::{Style, Stylize},
+    style::{Modifier, Style, Stylize},
     text::Text,
     widgets::{Block, Borders, Widget},
 };
@@ -163,7 +163,9 @@ impl Widget for &FocusList<'_> {
                         Constraint::Fill(1),
                     ])
                     .split(layout[3])[1];
-                let block = Block::default().borders(Borders::ALL).style(item.style);
+                let block = Block::default()
+                    .borders(Borders::ALL)
+                    .style(item.style.add_modifier(Modifier::BOLD));
                 let inner = block.inner(centered);
                 block.render(centered, buf);
                 Widget::render(item.content.clone().centered(), inner, buf);
