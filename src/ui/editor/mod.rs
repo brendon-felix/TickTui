@@ -110,8 +110,8 @@ impl Editor {
         self
     }
 
-    pub fn with_single_line(mut self, single_line: bool) -> Self {
-        self.single_line = single_line;
+    pub fn with_single_line(mut self) -> Self {
+        self.single_line = true;
         self
     }
 

@@ -36,12 +36,20 @@ pub struct TaskEditor {
 impl TaskEditor {
     pub fn new() -> Self {
         let editors = vec![
-            Editor::default().with_single_line(true).with_title("Title"),
+            Editor::default().with_single_line().with_title("Title"),
+            Editor::default().with_single_line().with_title("Date"),
+            // .with_validator(validator),
+            Editor::default().with_single_line().with_title("Time"),
+            // .with_validator(validator),
             Editor::default().with_title("Description"),
         ];
         let editor_state = CompositeEditorState::new(editors.len());
-        let editor = CompositeEditor::new(editors)
-            .with_constraints(vec![Constraint::Length(3), Constraint::Min(3)]);
+        let editor = CompositeEditor::new(editors).with_constraints(vec![
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(3),
+        ]);
         let effects: EffectManager<()> = EffectManager::default();
         // let c = Color::Rgb(25, 25, 25);
         // let timer = EffectTimer::from_ms(20000, Interpolation::ElasticOut);
@@ -67,12 +75,41 @@ impl TaskEditor {
         self.editor.editors[0].set_content(title);
     }
 
+    pub fn set_due_date_content(&mut self, due_date: &str) {
+        self.editor.editors[1].set_content(due_date);
+    }
+
+    pub fn set_due_time_content(&mut self, due_date: &str) {
+        self.editor.editors[2].set_content(due_date);
+    }
+
     pub fn set_description_content(&mut self, title: &str) {
-        self.editor.editors[1].set_content(title);
+        self.editor.editors[3].set_content(title);
     }
 
     pub fn load_task(&mut self, task: &Task) {
         self.set_title_content(&task.title);
+        if task.due_date.timestamp() > 0 {
+            let due_date_str = task
+                .due_date
+                .with_timezone(&chrono::Local)
+                .format("%m/%d/%Y")
+                .to_string();
+            self.set_due_date_content(&due_date_str);
+            if !task.is_all_day {
+                let due_time_str = task
+                    .due_date
+                    .with_timezone(&chrono::Local)
+                    .format("%I:%M %p")
+                    .to_string();
+                self.set_due_time_content(&due_time_str);
+            } else {
+                self.set_due_time_content("");
+            }
+        } else {
+            self.set_due_date_content("");
+            self.set_due_time_content("");
+        }
         self.set_description_content(&task.content);
         self.editor_state
             .get_sub_areas()
