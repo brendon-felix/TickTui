@@ -12,6 +12,8 @@ mod tasklist;
 
 use focusmode::FocusModeUI;
 use normalmode::NormalModeUI;
+use std::sync::Arc;
+use ticks::tasks::Task;
 
 enum AppUIMode {
     Focus,
@@ -28,9 +30,14 @@ impl AppUI {
     pub fn new() -> Self {
         Self {
             mode: AppUIMode::Normal,
-            focus_ui: FocusModeUI::new(),
+            focus_ui: FocusModeUI::default(),
             normal_ui: NormalModeUI::new(),
         }
+    }
+
+    pub fn update_tasks(&mut self, tasks: Vec<Arc<Task>>) {
+        self.focus_ui.update_tasks(tasks.clone());
+        self.normal_ui.update_tasks(tasks);
     }
 
     pub fn is_in_insert_mode(&self) -> bool {

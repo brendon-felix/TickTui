@@ -3,10 +3,12 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
 };
+use std::sync::Arc;
+use ticks::tasks::Task;
 
-use crate::ui::{
-    taskeditor::TaskEditor,
-    tasklist::{TaskItem, TaskList},
+use crate::{
+    tasks::{is_due_today, is_overdue},
+    ui::{taskeditor::TaskEditor, tasklist::TaskList},
 };
 
 enum ActivePane {
@@ -21,27 +23,8 @@ pub struct NormalModeUI {
 }
 impl NormalModeUI {
     pub fn new() -> Self {
-        let task_list = TaskList::new(vec![
-            TaskItem::new("Go to the laundromat").with_description("Remember to bring quarters."),
-            TaskItem::new("Buy groceries").with_description("- Milk\n- Eggs\n- Bread\n- Fruits"),
-            TaskItem::new("Finish the report").with_description("Due by end of the week."),
-            TaskItem::new("Call Alice").with_description("Discuss the project updates."),
-            TaskItem::new("Plan weekend trip").with_description("Check the weather forecast."),
-            TaskItem::new("Read a book").with_description("Start with chapter 1."),
-            TaskItem::new("Exercise for 30 minutes")
-                .with_description("Focus on cardio.\nWarm up first."),
-            TaskItem::new("Clean the house"),
-            TaskItem::new("Prepare presentation").with_description(
-                r#"Rough draft:
-- Introduction
-  - Objectives
-  - Agenda
-  - Key topics
-- Main points
-- Conclusion
-"#,
-            ),
-        ]);
+        let mut task_list = TaskList::default();
+        task_list.activate();
         let mut task_editor = TaskEditor::new();
         task_editor.deactivate();
         Self {
@@ -49,6 +32,13 @@ impl NormalModeUI {
             task_editor,
             active_pane: ActivePane::TaskList,
         }
+    }
+
+    pub fn update_tasks(&mut self, tasks: Vec<Arc<Task>>) {
+        self.task_list.set_tasks(tasks);
+        self.task_list
+            .filter_tasks(|now, task| is_due_today(now, task) | is_overdue(now, task));
+        self.task_list.tasks_loaded = true;
     }
 
     pub fn is_in_insert_mode(&self) -> bool {
@@ -91,11 +81,28 @@ impl NormalModeUI {
     }
 
     pub fn draw(&mut self, f: &mut Frame, area: Rect) {
+        let main_area = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![
+                Constraint::Fill(1),
+                Constraint::Max(40),
+                Constraint::Fill(1),
+            ])
+            .split(area)[1];
+        let main_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![
+                Constraint::Fill(1),
+                Constraint::Max(120),
+                Constraint::Fill(1),
+            ])
+            .split(main_area)[1];
+
         let chunks = Layout::new(
             Direction::Horizontal,
-            vec![Constraint::Percentage(40), Constraint::Percentage(60)],
+            vec![Constraint::Percentage(50), Constraint::Percentage(50)],
         )
-        .split(area);
+        .split(main_area);
         self.task_list.draw(f, chunks[0]);
         self.task_editor.draw(f, chunks[1]);
     }

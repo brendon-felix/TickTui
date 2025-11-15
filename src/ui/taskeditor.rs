@@ -3,6 +3,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Rect},
 };
+use ticks::tasks::Task;
 use tui_textarea::{CursorMove, Input};
 
 use crate::ui::{
@@ -12,7 +13,6 @@ use crate::ui::{
         actions::{EditorAction, EditorActions},
         handlers::{handle_input, handle_pending_action_input},
     },
-    tasklist::TaskItem,
 };
 
 // const SAMPLE_DESCRIPTION: &str = r#"This is a description.
@@ -59,9 +59,9 @@ impl TaskEditor {
         self.editor.editors[1].set_content(title);
     }
 
-    pub fn load_task(&mut self, task: &TaskItem) {
-        self.set_title_content(task.get_name());
-        self.set_description_content(task.get_description());
+    pub fn load_task(&mut self, task: &Task) {
+        self.set_title_content(&task.title);
+        self.set_description_content(&task.content);
     }
 
     pub fn is_in_insert_mode(&self) -> bool {

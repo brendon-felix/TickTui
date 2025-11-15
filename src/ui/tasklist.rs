@@ -1,15 +1,18 @@
+use chrono::{DateTime, Local, Utc};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
-    layout::Rect,
-    style::{Color, Modifier, Style},
-    widgets::Block,
+    layout::{Alignment, Rect},
+    style::{Color, Modifier, Style, Stylize},
+    text::Line,
+    widgets::{Block, Paragraph},
 };
+use std::sync::Arc;
+use ticks::tasks::Task;
 
 use crate::{
-    // ui::editor::create_block,
-    ui::multiselect::{MultiSelectList, MultiSelectListState},
-    // ui::{AppWidget, WidgetStyle},
+    tasks::is_overdue,
+    ui::multiselect::{MultiSelectList, MultiSelectListItem, MultiSelectListState},
 };
 
 // const ITEM_HEIGHT: u16 = 3;
@@ -19,47 +22,20 @@ use crate::{
 //     Visual,
 // }
 
-pub struct TaskItem {
-    name: String,
-    description: String,
-}
-
-impl TaskItem {
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            description: String::new(),
-        }
-    }
-
-    pub fn with_description(mut self, description: &str) -> Self {
-        self.description = description.to_string();
-        self
-    }
-
-    pub fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn get_description(&self) -> &str {
-        &self.description
-    }
-}
-
 #[derive(Default)]
 pub struct TaskList {
-    tasks: Vec<TaskItem>,
+    tasks: Vec<Arc<Task>>,
     list_state: MultiSelectListState,
     style: Style,
     current_block: Option<Block<'static>>,
+    pub tasks_loaded: bool,
     pub task_changed: bool,
 }
 
 #[allow(dead_code)]
 impl TaskList {
-    pub fn new(tasks: Vec<TaskItem>) -> Self {
-        let mut list_state = MultiSelectListState::default();
-        list_state.select(Some(0));
+    pub fn new(tasks: Vec<Arc<Task>>) -> Self {
+        let list_state = MultiSelectListState::default();
         let current_block = Some(
             Block::default()
                 .title("Tasks")
@@ -70,6 +46,7 @@ impl TaskList {
             list_state,
             style: Style::default(),
             current_block,
+            tasks_loaded: false,
             task_changed: true,
         }
     }
@@ -98,13 +75,35 @@ impl TaskList {
         self.style = Style::default().add_modifier(Modifier::DIM);
     }
 
-    pub fn with_tasks(mut self, tasks: Vec<TaskItem>) -> Self {
+    pub fn filter_tasks<F>(&mut self, filter_fn: F)
+    where
+        F: Fn(DateTime<Local>, &Task) -> bool,
+    {
+        let now = Local::now();
+        self.tasks.retain(|task| filter_fn(now, task));
+        if self.tasks.is_empty() {
+            self.list_state.select(None);
+        } else if let Some(selected) = self.list_state.selected() {
+            if selected >= self.tasks.len() {
+                self.list_state.select(Some(self.tasks.len() - 1));
+            }
+        }
+    }
+
+    pub fn with_tasks(mut self, tasks: Vec<Arc<Task>>) -> Self {
         self.tasks = tasks;
         self
     }
 
-    pub fn add_task(&mut self, name: &str) {
-        self.tasks.push(TaskItem::new(name));
+    pub fn set_tasks(&mut self, tasks: Vec<Arc<Task>>) {
+        self.tasks = tasks;
+        if self.tasks.is_empty() {
+            self.list_state.select(None);
+        }
+    }
+
+    pub fn add_task(&mut self, _task: Arc<Task>) {
+        // self.tasks.push(Task::new(task));
     }
 
     pub fn remove_task(&mut self, index: usize) {
@@ -143,17 +142,17 @@ impl TaskList {
         self.current_block = Some(block);
     }
 
-    pub fn get_tasks(&self) -> &Vec<TaskItem> {
-        &self.tasks
-    }
+    // pub fn get_tasks(&self) -> &Vec<TaskItem> {
+    //     &self.tasks
+    // }
 
     pub fn get_list_state(&self) -> &MultiSelectListState {
         &self.list_state
     }
 
-    pub fn get_current_task(&self) -> Option<&TaskItem> {
+    pub fn get_current_task(&self) -> Option<Arc<Task>> {
         if let Some(idx) = self.list_state.selected() {
-            self.tasks.get(idx)
+            self.tasks.get(idx).cloned()
         } else {
             None
         }
@@ -187,12 +186,38 @@ impl TaskList {
     }
 
     pub fn draw(&mut self, f: &mut Frame, area: Rect) {
-        let items: Vec<String> = self.tasks.iter().map(|task| task.name.clone()).collect();
+        if self.tasks.len() == 0 {
+            let msg = if !self.tasks_loaded {
+                "Loading Tasks..."
+            } else {
+                "No Tasks Available"
+            };
+            let mut p = Paragraph::new(msg)
+                .style(self.style)
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .title("No Tasks")
+                        .borders(ratatui::widgets::Borders::ALL),
+                );
+            if let Some(block) = self.current_block.clone() {
+                p = p.block(block);
+            }
+            f.render_widget(p, area);
+            return;
+        }
+
+        let items: Vec<MultiSelectListItem> = self
+            .tasks
+            .iter()
+            .map(|task| create_list_item(task))
+            .collect();
         let mut task_list = MultiSelectList::new(items)
             .with_style(self.style)
+            .with_highlight_symbol(" ● ")
             .with_highlight_style(
                 Style::new()
-                    .bg(Color::Rgb(50, 50, 50))
+                    .bg(Color::Rgb(40, 40, 40))
                     .add_modifier(Modifier::BOLD),
             );
 
@@ -200,6 +225,37 @@ impl TaskList {
             task_list = task_list.with_block(block);
         }
         f.render_stateful_widget(task_list, area, &mut self.list_state);
+    }
+}
+
+fn create_list_item(task: &Arc<Task>) -> MultiSelectListItem<'static> {
+    let line1 = Line::from("");
+    let line2 = Line::from(task.title.clone());
+    let line3 = if let Some(date_str) = format_date(&task.due_date, task.is_all_day) {
+        let mut line = Line::from(date_str);
+        let now = chrono::Local::now();
+        if is_overdue(now, task) {
+            line = line.style(Style::default().fg(Color::Red).dim());
+        } else {
+            line = line.style(Style::default().dim());
+        }
+        line
+    } else {
+        Line::from("")
+    };
+    MultiSelectListItem::new(vec![line1, line2, line3])
+}
+
+fn format_date(dt: &DateTime<Utc>, is_all_day: bool) -> Option<String> {
+    if dt.timestamp() == 0 {
+        None
+    } else {
+        let local: DateTime<Local> = dt.with_timezone(&Local);
+        if is_all_day {
+            Some(local.format("%m/%d/%Y").to_string())
+        } else {
+            Some(local.format("%m/%d/%Y %I:%M %p").to_string())
+        }
     }
 }
 

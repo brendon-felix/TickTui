@@ -1,87 +1,213 @@
-use ratatui::widgets::Widget;
+use ratatui::{
+    layout::{Constraint, Direction, Layout},
+    style::{Style, Stylize},
+    text::Text,
+    widgets::{Block, Borders, Widget},
+};
 
-pub struct FocusList<T> {
-    items: Vec<T>,
+pub struct FocusListItem<'a> {
+    content: Text<'a>,
+    style: Style,
+}
+
+impl<'a> FocusListItem<'a> {
+    pub fn new<T>(content: T) -> Self
+    where
+        T: Into<Text<'a>>,
+    {
+        Self {
+            content: content.into(),
+            style: Style::default(),
+        }
+    }
+}
+
+impl<'a, T> From<T> for FocusListItem<'a>
+where
+    T: Into<Text<'a>>,
+{
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+#[derive(Default)]
+pub struct FocusList<'a> {
     focused_index: Option<usize>,
+    block: Option<Block<'a>>,
+    items: Vec<FocusListItem<'a>>,
+    style: Style,
 }
 
 #[allow(dead_code)]
-impl<T> FocusList<T> {
-    pub fn new() -> Self {
+impl<'a> FocusList<'a> {
+    pub fn new<T>(items: T) -> Self
+    where
+        T: IntoIterator,
+        T::Item: Into<FocusListItem<'a>>,
+    {
         Self {
-            items: Vec::new(),
-            focused_index: None,
+            items: items.into_iter().map(Into::into).collect(),
+            ..Self::default()
         }
     }
 
-    pub fn with_items(mut self, items: Vec<T>) -> Self {
-        self.items = items;
+    pub fn with_block(mut self, block: Block<'a>) -> Self {
+        self.block = Some(block);
         self
     }
 
-    pub fn set_items(&mut self, items: Vec<T>) {
-        self.items = items;
-        self.focused_index = None;
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
     }
 
-    pub fn items(&self) -> &Vec<T> {
-        &self.items
+    pub fn with_focused_index(mut self, index: usize) -> Self {
+        self.focused_index = Some(index);
+        self
+    }
+
+    pub fn set_items<T>(&mut self, items: T)
+    where
+        T: IntoIterator,
+        T::Item: Into<FocusListItem<'a>>,
+    {
+        self.items = items.into_iter().map(Into::into).collect();
     }
 
     pub fn focused_index(&self) -> Option<usize> {
         self.focused_index
     }
 
-    pub fn focus_previous(&mut self) {
-        if self.items.is_empty() {
-            self.focused_index = None;
-            return;
+    pub fn next_index(&self) -> Option<usize> {
+        if let Some(current) = self.focused_index {
+            let next = current.saturating_add(1);
+            if next < self.items.len() {
+                Some(next)
+            } else {
+                None
+            }
+        } else {
+            None
         }
+    }
 
-        match self.focused_index {
-            Some(i) => {
-                if i > 0 {
-                    self.focused_index = Some(i - 1);
-                }
-                // If i == 0, stay at first item (don't deselect)
+    pub fn previous_index(&self) -> Option<usize> {
+        if let Some(current) = self.focused_index {
+            if current > 0 {
+                Some(current.saturating_sub(1))
+            } else {
+                None
             }
-            None => {
-                // No focus, focus last item
-                self.focused_index = Some(self.items.len() - 1);
+        } else {
+            None
+        }
+    }
+
+    pub fn focus(&mut self, index: Option<usize>) {
+        if let Some(i) = index {
+            if i >= self.items.len() {
+                self.focused_index = Some(self.items.len().saturating_sub(1));
+            } else {
+                self.focused_index = Some(i);
             }
+        } else {
+            self.focused_index = None;
         }
     }
 
     pub fn focus_next(&mut self) {
-        if self.items.is_empty() {
-            self.focused_index = None;
-            return;
-        }
+        let next = self.focused_index.map_or(0, |i| i.saturating_add(1));
+        self.focus(Some(next));
+    }
 
-        match self.focused_index {
-            Some(i) => {
-                if i + 1 < self.items.len() {
-                    self.focused_index = Some(i + 1);
-                }
-                // If i is at the last item, stay there (don't deselect)
-            }
-            None => {
-                // No focus, focus first item
-                self.focused_index = Some(0);
-            }
-        }
+    pub fn focus_previous(&mut self) {
+        let previous = self
+            .focused_index
+            .map_or(usize::MAX, |i| i.saturating_sub(1));
+        self.focus(Some(previous));
+    }
+
+    pub fn focus_first(&mut self) {
+        self.focus(Some(0));
+    }
+
+    pub fn focus_last(&mut self) {
+        self.focus(Some(usize::MAX));
     }
 }
 
-impl Widget for FocusList<String> {
+impl Widget for &FocusList<'_> {
     fn render(self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer) {
-        for (i, item) in self.items.iter().enumerate() {
-            let style = if Some(i) == self.focused_index {
-                ratatui::style::Style::default().fg(ratatui::style::Color::Yellow)
-            } else {
-                ratatui::style::Style::default()
-            };
-            buf.set_string(area.x, area.y + i as u16, item, style);
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(7), // 1: previous item
+                Constraint::Max(3),
+                Constraint::Min(7), // 3: focused item
+                Constraint::Max(3),
+                Constraint::Length(7), // 5: next item
+                Constraint::Fill(1),
+            ])
+            .split(area);
+
+        if let Some(focused) = self.focused_index() {
+            if focused < self.items.len() {
+                let item = &self.items[focused];
+                let centered = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints(vec![
+                        Constraint::Fill(1),
+                        Constraint::Max(100),
+                        Constraint::Fill(1),
+                    ])
+                    .split(layout[3])[1];
+                let block = Block::default().borders(Borders::ALL).style(item.style);
+                let inner = block.inner(centered);
+                block.render(centered, buf);
+                Widget::render(item.content.clone().centered(), inner, buf);
+            }
+
+            if let Some(previous) = self.previous_index() {
+                if previous < self.items.len() {
+                    let item = &self.items[previous];
+                    let centered = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints(vec![
+                            Constraint::Fill(1),
+                            Constraint::Max(50),
+                            Constraint::Fill(1),
+                        ])
+                        .split(layout[1])[1];
+                    let block = Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().dim());
+                    let inner = block.inner(centered);
+                    block.render(centered, buf);
+                    Widget::render(item.content.clone().centered(), inner, buf);
+                }
+            }
+
+            if let Some(next) = self.next_index() {
+                if next < self.items.len() {
+                    let item = &self.items[next];
+                    let centered = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints(vec![
+                            Constraint::Fill(1),
+                            Constraint::Max(50),
+                            Constraint::Fill(1),
+                        ])
+                        .split(layout[5])[1];
+                    let block = Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().dim());
+                    let inner = block.inner(centered);
+                    block.render(centered, buf);
+                    Widget::render(item.content.clone().centered(), inner, buf);
+                }
+            }
         }
     }
 }

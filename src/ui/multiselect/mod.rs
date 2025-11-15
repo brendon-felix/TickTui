@@ -98,6 +98,14 @@ impl<'a> MultiSelectList<'a> {
         self
     }
 
+    pub fn with_highlight_symbol<L>(mut self, symbol: L) -> Self
+    where
+        L: Into<Line<'a>>,
+    {
+        self.highlight_symbol = Some(symbol.into());
+        self
+    }
+
     pub fn set_style(&mut self, style: Style) {
         self.style = style;
     }
@@ -183,7 +191,9 @@ impl StatefulWidget for &MultiSelectList<'_> {
         // let selection_spacing = self.highlight_spacing.should_add(state.selected.is_some());
         let selection_spacing = match self.highlight_spacing {
             HighlightSpacing::Always => true,
-            HighlightSpacing::WhenSelected => state.selected.is_some(),
+            HighlightSpacing::WhenSelected => {
+                state.selected.is_some() || self.highlight_symbol.is_some()
+            }
             HighlightSpacing::Never => false,
         };
         for (i, item) in self
@@ -202,12 +212,6 @@ impl StatefulWidget for &MultiSelectList<'_> {
             let item_style = self.style.patch(item.style);
             buf.set_style(row_area, item_style);
 
-            // let is_selected = state.selected == Some(i)
-            //     || (state
-            //         .visual_start
-            //         .as_ref()
-            //         .is_some_and(|start| start <= &i));
-
             let is_selected = if let Some(curr) = state.selected {
                 if curr == i {
                     true
@@ -220,7 +224,7 @@ impl StatefulWidget for &MultiSelectList<'_> {
                 false
             };
 
-            let item_area = if selection_spacing {
+            let base_item_area = if selection_spacing {
                 Rect {
                     x: row_area.x + highlight_symbol_width,
                     width: row_area.width.saturating_sub(highlight_symbol_width),
@@ -229,22 +233,36 @@ impl StatefulWidget for &MultiSelectList<'_> {
             } else {
                 row_area
             };
+
+            let content_height = item.content.height() as u16;
+            let vertical_padding = (ITEM_HEIGHT.saturating_sub(content_height)) / 2;
+            let item_area = Rect {
+                y: base_item_area.y + vertical_padding,
+                height: content_height.min(ITEM_HEIGHT),
+                ..base_item_area
+            };
+
             Widget::render(&item.content, item_area, buf);
 
             if is_selected {
                 buf.set_style(row_area, self.highlight_style);
             }
             if selection_spacing {
-                for j in 0..item.content.height() {
-                    // if the item is selected, we need to display the highlight symbol:
-                    // - either for the first line of the item only,
-                    // - or for each line of the item if the appropriate option is set
-                    let line = if is_selected && (j == 0 || self.repeat_highlight_symbol) {
+                let content_height = item.content.height() as u16;
+                let vertical_padding = (ITEM_HEIGHT.saturating_sub(content_height)) / 2;
+
+                for j in 0..content_height {
+                    let line = if is_selected && (j == 1 || self.repeat_highlight_symbol) {
                         highlight_symbol
                     } else {
                         &empty_symbol
                     };
-                    let highlight_area = Rect::new(x, y + j as u16, highlight_symbol_width, 1);
+                    let highlight_area = Rect::new(
+                        x,
+                        y + vertical_padding + j as u16,
+                        highlight_symbol_width,
+                        1,
+                    );
                     line.render(highlight_area, buf);
                 }
             }
@@ -262,28 +280,18 @@ impl MultiSelectList<'_> {
     ) -> (usize, usize) {
         let offset = offset.min(self.items.len().saturating_sub(1));
 
-        // Note: visible here implies visible in the given area
         let mut first_visible_index = offset;
         let mut last_visible_index = offset;
-
-        // Current height of all items in the list to render, beginning at the offset
         let mut height_from_offset = 0;
 
-        // Calculate the last visible index and total height of the items
-        // that will fit in the available space
         for _item in self.items.iter().skip(offset) {
             if height_from_offset + ITEM_HEIGHT > (max_height as u16) {
                 break;
             }
-
             height_from_offset += ITEM_HEIGHT;
-
             last_visible_index += 1;
         }
 
-        // Get the selected index and apply scroll_padding to it, but still honor the offset if
-        // nothing is selected. This allows for the list to stay at a position after select()ing
-        // None.
         let index_to_display = self
             .apply_scroll_padding_to_selected_index(
                 selected,
@@ -293,47 +301,26 @@ impl MultiSelectList<'_> {
             )
             .unwrap_or(offset);
 
-        // Recall that last_visible_index is the index of what we
-        // can render up to in the given space after the offset
-        // If we have an item selected that is out of the viewable area (or
-        // the offset is still set), we still need to show this item
         while index_to_display >= last_visible_index {
             height_from_offset = height_from_offset.saturating_add(ITEM_HEIGHT);
-
             last_visible_index += 1;
-
-            // Now we need to hide previous items since we didn't have space
-            // for the selected/offset item
-            while height_from_offset > ITEM_HEIGHT {
+            while height_from_offset > (max_height as u16) {
                 height_from_offset = height_from_offset.saturating_sub(ITEM_HEIGHT);
-
-                // Remove this item to view by starting at the next item index
                 first_visible_index += 1;
             }
         }
 
-        // Here we're doing something similar to what we just did above
-        // If the selected item index is not in the viewable area, let's try to show the item
         while index_to_display < first_visible_index {
             first_visible_index -= 1;
-
             height_from_offset = height_from_offset.saturating_add(ITEM_HEIGHT);
-
-            // Don't show an item if it is beyond our viewable height
             while height_from_offset > (max_height as u16) {
                 last_visible_index -= 1;
-
                 height_from_offset = height_from_offset.saturating_sub(ITEM_HEIGHT);
             }
         }
-
         (first_visible_index, last_visible_index)
     }
 
-    /// Applies scroll padding to the selected index, reducing the padding value to keep the
-    /// selected item on screen even with items of inconsistent sizes
-    ///
-    /// This function is sensitive to how the bounds checking function handles item height
     fn apply_scroll_padding_to_selected_index(
         &self,
         selected: Option<usize>,
@@ -344,10 +331,6 @@ impl MultiSelectList<'_> {
         let last_valid_index = self.items.len().saturating_sub(1);
         let selected = selected?.min(last_valid_index);
 
-        // The bellow loop handles situations where the list item sizes may not be consistent,
-        // where the offset would have excluded some items that we want to include, or could
-        // cause the offset value to be set to an inconsistent value each time we render.
-        // The padding value will be reduced in case any of these issues would occur
         let mut scroll_padding = self.scroll_padding;
         while scroll_padding > 0 {
             let mut height_around_selected = 0;
@@ -365,10 +348,18 @@ impl MultiSelectList<'_> {
         }
 
         Some(
-            if (selected + scroll_padding).min(last_valid_index) >= last_visible_index {
-                selected + scroll_padding
-            } else if selected.saturating_sub(scroll_padding) < first_visible_index {
-                selected.saturating_sub(scroll_padding)
+            if selected >= last_visible_index {
+                if selected == last_visible_index {
+                    selected // No padding for single-step scrolling
+                } else {
+                    (selected + scroll_padding).min(last_valid_index)
+                }
+            } else if selected < first_visible_index {
+                if selected + 1 == first_visible_index {
+                    selected // No padding for single-step scrolling
+                } else {
+                    selected.saturating_sub(scroll_padding)
+                }
             } else {
                 selected
             }
@@ -376,17 +367,6 @@ impl MultiSelectList<'_> {
         )
     }
 }
-// impl Styled for MultiSelectList<'_> {
-//     type Item = Self;
-
-//     fn style(&self) -> Style {
-//         self.style
-//     }
-
-//     fn set_style<S: Into<Style>>(self, style: S) -> Self::Item {
-//         self.style(style)
-//     }
-// }
 
 impl<'a, Item> FromIterator<Item> for MultiSelectList<'a>
 where

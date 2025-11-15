@@ -1,12 +1,14 @@
+use std::sync::{Arc, Mutex};
+
 use crate::{
+    tasks::fetch_all_tasks,
     term::{self, AppTerminal},
     ui::AppUI,
 };
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
-// use std::sync::Arc;
-// use ticks::TickTick;
+use ticks::{TickTick, tasks::Task};
 use tokio::sync::mpsc::{self, UnboundedSender};
 
 enum Action {
@@ -14,39 +16,41 @@ enum Action {
     Render,
     Resize(u16, u16),
     Quit,
-    // Error(String),
+    Error(Error),
+    RefreshTasks,
+    UpdateCache,
 }
 
 pub struct App {
-    // client: Arc<TickTick>,
+    client: Arc<TickTick>,
+    cached_tasks: Vec<Arc<Task>>,
+    pending_tasks: Arc<Mutex<Option<Vec<Task>>>>,
     ti: AppTerminal,
     ui: AppUI,
     quitting: bool,
 }
 
 impl App {
-    // pub fn new(client: Arc<TickTick>) -> Result<Self> {
-    //     let ti = TerminalInterface::new()?;
-    //     let ui = UserInterface::new();
-    //     let quitting = false;
-    //     Ok(Self {
-    //         client,
-    //         ti,
-    //         ui,
-    //         quitting,
-    //     })
-    // }
-
-    pub fn new() -> Result<Self> {
+    pub fn new(client: Arc<TickTick>) -> Result<Self> {
+        let cached_tasks = Vec::new();
+        let pending_tasks = Arc::new(Mutex::new(None));
         let ti = AppTerminal::new()?;
         let ui = AppUI::new();
         let quitting = false;
-        Ok(Self { ti, ui, quitting })
+        Ok(Self {
+            client,
+            cached_tasks,
+            pending_tasks,
+            ti,
+            ui,
+            quitting,
+        })
     }
 
     pub async fn run(&mut self) -> Result<()> {
         let (tx, mut rx) = mpsc::unbounded_channel();
         self.ti.enter()?;
+        tx.send(Action::RefreshTasks)?;
 
         loop {
             if let Some(event) = self.ti.next().await {
@@ -54,7 +58,7 @@ impl App {
             }
 
             while let Ok(action) = rx.try_recv() {
-                self.update(action)?;
+                self.execute_action(action, &tx)?;
             }
 
             if self.quitting {
@@ -64,6 +68,38 @@ impl App {
 
         self.ti.exit()?;
         Ok(())
+    }
+
+    fn refresh_tasks(&mut self, tx: UnboundedSender<Action>) {
+        let client = Arc::clone(&self.client);
+        let pending = Arc::clone(&self.pending_tasks);
+        tokio::spawn(async move {
+            match fetch_all_tasks(&client).await {
+                Ok(tasks) => {
+                    // Store the tasks in pending storage
+                    if let Ok(mut guard) = pending.lock() {
+                        *guard = Some(tasks);
+                    }
+                    let _ = tx.send(Action::UpdateCache);
+                }
+                Err(e) => {
+                    let _ = tx.send(Action::Error(e));
+                }
+            }
+        });
+    }
+
+    fn update_cache(&mut self) {
+        let tasks_opt = if let Ok(mut guard) = self.pending_tasks.lock() {
+            guard.take()
+        } else {
+            None
+        };
+
+        if let Some(tasks) = tasks_opt {
+            self.cached_tasks = tasks.into_iter().map(Arc::new).collect();
+            self.ui.update_tasks(self.cached_tasks.clone());
+        }
     }
 
     fn handle_event(&mut self, event: term::Event, tx: &UnboundedSender<Action>) -> Result<()> {
@@ -110,15 +146,15 @@ impl App {
         Ok(())
     }
 
-    fn update(&mut self, action: Action) -> Result<()> {
+    fn execute_action(&mut self, action: Action, tx: &UnboundedSender<Action>) -> Result<()> {
         match action {
             Action::Tick => {}
             Action::Render => self.render()?,
             Action::Resize(w, h) => self.ti.resize(w, h)?,
-            // Action::Click(pos) => self.ui.handle_mouse_event(pos),
             Action::Quit => self.quitting = true,
-            // Action::Error(msg) => self.error(msg),
-            // _ => {}
+            Action::RefreshTasks => self.refresh_tasks(tx.clone()),
+            Action::UpdateCache => self.update_cache(),
+            Action::Error(_e) => {}
         }
         Ok(())
     }
