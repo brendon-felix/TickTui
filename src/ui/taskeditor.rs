@@ -89,10 +89,6 @@ impl TaskEditor {
             match action_opt {
                 Some(action) => match action {
                     EditorAction::ApplyInput(_) => self.editor.execute_action(action),
-                    EditorAction::MoveCursor(mvmt) => match mvmt {
-                        CursorMove::Left if self.editor.is_cursor_at_line_start() => {}
-                        _ => self.editor.execute_action(action),
-                    },
                     _ => self.editor.execute_action(action),
                 },
                 None => {}

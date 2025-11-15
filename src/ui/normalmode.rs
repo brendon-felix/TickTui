@@ -42,7 +42,10 @@ impl NormalModeUI {
     }
 
     pub fn is_in_insert_mode(&self) -> bool {
-        false
+        match self.active_pane {
+            ActivePane::TaskList => false,
+            ActivePane::TaskEditor => self.task_editor.is_in_insert_mode(),
+        }
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
