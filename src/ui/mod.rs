@@ -1,6 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
 use ratatui::{Frame, layout::Rect};
 
+mod animate;
 mod composite;
 mod editor;
 mod focuslist;
@@ -68,7 +69,7 @@ impl AppUI {
 
     pub fn draw(&mut self, f: &mut Frame, area: Rect, last_frame: Instant) {
         match self.mode {
-            AppUIMode::Focus => self.focus_ui.draw(f, area),
+            AppUIMode::Focus => self.focus_ui.draw(f, area, last_frame),
             AppUIMode::Normal => self.normal_ui.draw(f, area, last_frame),
         }
     }

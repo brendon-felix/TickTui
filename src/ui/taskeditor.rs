@@ -5,7 +5,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Rect},
     style::Color,
-    widgets::{Block, Borders},
+    widgets::{Block, BorderType, Borders},
 };
 use tachyonfx::{EffectManager, EffectTimer, Interpolation, Motion, fx};
 use ticks::tasks::Task;
@@ -115,22 +115,28 @@ impl TaskEditor {
             .get_sub_areas()
             .iter()
             .map(|area| {
-                let inner = Block::default().borders(Borders::ALL).inner(area.clone());
-                fx::sweep_in(
-                    Motion::LeftToRight,
-                    5,
-                    0,
-                    Color::Rgb(25, 25, 25),
-                    EffectTimer::from_ms(500, Interpolation::Linear),
-                )
-                .with_area(inner)
+                let inner = Block::default()
+                    .border_set(BorderType::Rounded.to_border_set())
+                    .borders(Borders::ALL)
+                    .inner(area.clone());
+                // fx::sweep_in(
+                //     Motion::LeftToRight,
+                //     5,
+                //     0,
+                //     Color::Rgb(25, 25, 25),
+                //     EffectTimer::from_ms(500, Interpolation::Linear),
+                // )
+                fx::coalesce(EffectTimer::from_ms(200, Interpolation::Linear)).with_area(inner)
             })
             .for_each(|fx| self.effects.add_effect(fx));
     }
 
     pub fn is_in_insert_mode(&self) -> bool {
         if let Some(mode) = self.editor.get_mode() {
-            mode == EditorMode::Insert
+            match mode {
+                EditorMode::Insert | EditorMode::Visual(_) => true,
+                _ => false,
+            }
         } else {
             false
         }

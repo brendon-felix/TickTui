@@ -49,6 +49,12 @@ impl NormalModeUI {
         self.task_list
             .filter_tasks(|now, task| is_due_today(now, task) | is_overdue(now, task));
         self.task_list.tasks_loaded = true;
+        if self.task_list.task_changed {
+            if let Some(selected_task) = self.task_list.get_current_task() {
+                self.task_editor.load_task(&selected_task);
+            }
+            self.task_list.task_changed = false;
+        }
     }
 
     pub fn is_in_insert_mode(&self) -> bool {

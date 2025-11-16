@@ -4,8 +4,8 @@ use ratatui::{
     Frame,
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style, Stylize},
-    text::Line,
-    widgets::{Block, Paragraph},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Paragraph},
 };
 use std::{sync::Arc, time::Instant};
 use tachyonfx::EffectManager;
@@ -31,7 +31,7 @@ pub struct TaskList {
     current_block: Option<Block<'static>>,
     pub tasks_loaded: bool,
     pub task_changed: bool,
-    effects: EffectManager<()>,
+    _effects: EffectManager<()>,
 }
 
 #[allow(dead_code)]
@@ -41,9 +41,10 @@ impl TaskList {
         let current_block = Some(
             Block::default()
                 .title("Tasks")
+                .border_set(BorderType::Rounded.to_border_set())
                 .borders(ratatui::widgets::Borders::ALL),
         );
-        let effects: EffectManager<()> = EffectManager::default();
+        let _effects: EffectManager<()> = EffectManager::default();
         Self {
             tasks,
             list_state,
@@ -51,7 +52,7 @@ impl TaskList {
             current_block,
             tasks_loaded: false,
             task_changed: true,
-            effects,
+            _effects,
         }
     }
 
@@ -64,6 +65,7 @@ impl TaskList {
         self.current_block = Some(
             Block::default()
                 .title("Tasks")
+                .border_set(BorderType::Rounded.to_border_set())
                 .borders(ratatui::widgets::Borders::ALL),
         );
         self.style = Style::default();
@@ -74,6 +76,7 @@ impl TaskList {
             Block::default()
                 .title("Tasks")
                 .borders(ratatui::widgets::Borders::ALL)
+                .border_set(BorderType::Rounded.to_border_set())
                 .style(Style::default().add_modifier(Modifier::DIM)),
         );
         self.style = Style::default().add_modifier(Modifier::DIM);
@@ -195,7 +198,7 @@ impl TaskList {
         self.task_changed = idx != self.list_state.selected();
     }
 
-    pub fn draw(&mut self, f: &mut Frame, area: Rect, last_frame: Instant) {
+    pub fn draw(&mut self, f: &mut Frame, area: Rect, _last_frame: Instant) {
         if self.tasks.len() == 0 {
             let msg = if !self.tasks_loaded {
                 "Loading Tasks..."
@@ -208,6 +211,7 @@ impl TaskList {
                 .block(
                     Block::default()
                         .title("No Tasks")
+                        .border_set(BorderType::Rounded.to_border_set())
                         .borders(ratatui::widgets::Borders::ALL),
                 );
             if let Some(block) = self.current_block.clone() {
@@ -224,10 +228,11 @@ impl TaskList {
             .collect();
         let mut task_list = MultiSelectList::new(items)
             .with_style(self.style)
-            .with_highlight_symbol(" ● ")
+            // .with_highlight_symbol(" ● ")
+            .with_highlight_symbol(" ")
             .with_highlight_style(
                 Style::new()
-                    .bg(Color::Rgb(40, 40, 40))
+                    .bg(Color::Rgb(30, 30, 30))
                     .add_modifier(Modifier::BOLD),
             );
 
@@ -235,9 +240,9 @@ impl TaskList {
             task_list = task_list.with_block(block);
         }
         f.render_stateful_widget(task_list, area, &mut self.list_state);
-        let elapsed = last_frame.elapsed();
-        self.effects
-            .process_effects(elapsed.into(), f.buffer_mut(), area);
+        // let elapsed = last_frame.elapsed();
+        // self.effects
+        //     .process_effects(elapsed.into(), f.buffer_mut(), area);
     }
 }
 
@@ -246,6 +251,7 @@ fn create_list_item(task: &Arc<Task>) -> MultiSelectListItem<'static> {
     let is_today = is_due_today(now, task);
     let line1 = Line::from("");
     let line2 = Line::from(task.title.clone());
+    // let line3 = Line::from("");
     let line3 = if let Some(date_str) = format_date(&task.due_date, task.is_all_day, is_today) {
         let mut line = Line::from(date_str);
         if is_overdue(now, task) {

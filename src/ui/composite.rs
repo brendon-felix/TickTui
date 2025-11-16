@@ -151,7 +151,11 @@ impl EditorActions for CompositeEditor {
             if let Some(editor) = self.get_active_editor() {
                 match action {
                     EditorAction::MoveCursor(CursorMove::Up) => match editor.get_cursor_pos() {
-                        (row, _col) if row == 0 && active_index > 0 => {
+                        (row, _col)
+                            if row == 0
+                                && active_index > 0
+                                && editor.get_mode() == EditorMode::Normal =>
+                        {
                             cursor_movement =
                                 Some((editor.get_desired_column(), CursorMove::Bottom));
                             self.set_active_editor(Some(active_index - 1));
@@ -161,26 +165,23 @@ impl EditorActions for CompositeEditor {
                     EditorAction::MoveCursor(CursorMove::Down) => match editor.get_cursor_pos() {
                         (row, _col)
                             if row >= editor.get_lines().len().saturating_sub(1)
-                                && active_index + 1 < num_editors =>
+                                && active_index + 1 < num_editors
+                                && editor.get_mode() == EditorMode::Normal =>
                         {
                             cursor_movement = Some((editor.get_desired_column(), CursorMove::Top));
                             self.set_active_editor(Some(active_index + 1));
                         }
                         _ => editor.execute_action(action),
                     },
-                    EditorAction::MoveCursor(CursorMove::Top) if active_index <= 0 => {
-                        cursor_movement = Some((editor.get_desired_column(), CursorMove::Top));
-                    }
-                    EditorAction::MoveCursor(CursorMove::Top) => {
+                    EditorAction::MoveCursor(CursorMove::Top)
+                        if editor.get_mode() == EditorMode::Normal =>
+                    {
                         cursor_movement = Some((editor.get_desired_column(), CursorMove::Top));
                         self.set_active_editor(Some(0));
                     }
                     EditorAction::MoveCursor(CursorMove::Bottom)
-                        if active_index >= num_editors - 1 =>
+                        if editor.get_mode() == EditorMode::Normal =>
                     {
-                        cursor_movement = Some((editor.get_desired_column(), CursorMove::Bottom));
-                    }
-                    EditorAction::MoveCursor(CursorMove::Bottom) => {
                         cursor_movement = Some((editor.get_desired_column(), CursorMove::Bottom));
                         self.set_active_editor(Some(num_editors - 1));
                     }

@@ -3,7 +3,7 @@ use ratatui::{
     layout::Rect,
     style::Style,
     text::{Line, Text},
-    widgets::{Block, HighlightSpacing, StatefulWidget, Widget, WidgetRef},
+    widgets::{Block, BorderType, Borders, HighlightSpacing, StatefulWidget, Widget, WidgetRef},
 };
 
 pub use self::state::MultiSelectListState;
@@ -66,7 +66,6 @@ pub struct MultiSelectList<'a> {
     style: Style,
     highlight_style: Style,
     highlight_symbol: Option<Line<'a>>,
-    repeat_highlight_symbol: bool,
     highlight_spacing: HighlightSpacing,
     scroll_padding: usize,
 }
@@ -183,9 +182,9 @@ impl StatefulWidget for &MultiSelectList<'_> {
             .as_ref()
             .unwrap_or(&default_highlight_symbol);
         let highlight_symbol_width = highlight_symbol.width() as u16;
-        let empty_symbol = " ".repeat(highlight_symbol_width as usize);
+        // let empty_symbol = " ".repeat(highlight_symbol_width as usize);
         // let empty_symbol = empty_symbol.to_line();
-        let empty_symbol = Line::from(empty_symbol);
+        // let empty_symbol = Line::from(empty_symbol);
 
         let mut current_height = 0;
         // let selection_spacing = self.highlight_spacing.should_add(state.selected.is_some());
@@ -246,26 +245,33 @@ impl StatefulWidget for &MultiSelectList<'_> {
 
             if is_selected {
                 buf.set_style(row_area, self.highlight_style);
+                Block::default()
+                    .border_set(BorderType::QuadrantOutside.to_border_set())
+                    // .borders(Borders::LEFT | Borders::RIGHT)
+                    .borders(Borders::LEFT)
+                    // .border_style(self.highlight_style)
+                    // .border_style(Style::default().fg(Color::Indexed(1)))
+                    .render(row_area, buf);
             }
-            if selection_spacing {
-                let content_height = item.content.height() as u16;
-                let vertical_padding = (ITEM_HEIGHT.saturating_sub(content_height)) / 2;
+            // if selection_spacing {
+            //     let content_height = item.content.height() as u16;
+            //     let vertical_padding = (ITEM_HEIGHT.saturating_sub(content_height)) / 2;
 
-                for j in 0..content_height {
-                    let line = if is_selected && (j == 1 || self.repeat_highlight_symbol) {
-                        highlight_symbol
-                    } else {
-                        &empty_symbol
-                    };
-                    let highlight_area = Rect::new(
-                        x,
-                        y + vertical_padding + j as u16,
-                        highlight_symbol_width,
-                        1,
-                    );
-                    line.render(highlight_area, buf);
-                }
-            }
+            //     for j in 0..content_height {
+            //         let line = if is_selected && (j == 1 || self.repeat_highlight_symbol) {
+            //             highlight_symbol
+            //         } else {
+            //             &empty_symbol
+            //         };
+            //         let highlight_area = Rect::new(
+            //             x,
+            //             y + vertical_padding + j as u16,
+            //             highlight_symbol_width,
+            //             1,
+            //         );
+            //         line.render(highlight_area, buf);
+            //     }
+            // }
         }
     }
 }
